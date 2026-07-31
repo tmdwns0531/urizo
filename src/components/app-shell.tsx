@@ -51,7 +51,14 @@ export function AppShell({
                   <span className="demo-pill__dot" />
                   익명 추천
                 </span>
-                <Link href="/choice" className="text-link">
+                <Link
+                  href="/choice"
+                  className="text-link"
+                  onNavigate={(event) => {
+                    event.preventDefault();
+                    window.location.assign("/choice");
+                  }}
+                >
                   새 추천 받기
                 </Link>
               </div>
