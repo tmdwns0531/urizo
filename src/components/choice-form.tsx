@@ -82,20 +82,20 @@ const scenarioOptions: Array<{
   },
   {
     value: "approval",
-    label: "승인 게이트",
+    label: "조건 완화 확인",
     description: "30분 → 45분 제안",
     tone: "violet",
   },
   {
     value: "policy_block",
-    label: "정책 차단",
-    description: "연령 부적합 후보 제거",
+    label: "연령 부적합 제외",
+    description: "볼 수 없는 작품 걸러내기",
     tone: "teal",
   },
   {
     value: "budget_fallback",
-    label: "예산 폴백",
-    description: "규칙 기반 추천 전환",
+    label: "AI 중단 시 대체",
+    description: "규칙 기반 추천으로 전환",
     tone: "amber",
   },
 ];
@@ -382,7 +382,7 @@ export function ChoiceForm({ demoLabEnabled }: ChoiceFormProps) {
             <span>
               {naturalLanguage.trim()
                 ? `이렇게 찾을게요: “${naturalLanguage.trim()}”`
-                : "칩 선택만으로도 충분해요."}
+                : "위에서 고른 조건만으로도 충분해요."}
             </span>
             <small>{naturalLanguage.length}/140</small>
           </div>
@@ -427,6 +427,14 @@ export function ChoiceForm({ demoLabEnabled }: ChoiceFormProps) {
                 {originOptions.find((item) => item.value === origin)?.label}
               </dd>
             </div>
+            <div className="choice-summary__natural">
+              <dt>추가 요청</dt>
+              <dd>
+                {naturalLanguage.trim()
+                  ? `“${naturalLanguage.trim()}”`
+                  : "없음"}
+              </dd>
+            </div>
           </dl>
           <div className="summary-providers">
             <span>
@@ -445,7 +453,9 @@ export function ChoiceForm({ demoLabEnabled }: ChoiceFormProps) {
             <span aria-hidden="true">◇</span>
             <p>
               <strong>조건을 몰래 바꾸지 않아요.</strong>
-              결과가 부족하면 먼저 물어봅니다.
+              고른 조건은 그대로 지키고, 적어주신 추가 요청은 조건을
+              덮어쓰지 않고 검색 문장에 함께 반영해요. 결과가 부족하면
+              먼저 물어봅니다.
             </p>
           </div>
           <button
@@ -466,9 +476,9 @@ export function ChoiceForm({ demoLabEnabled }: ChoiceFormProps) {
           <legend>
             <span>
               <span className="demo-live-dot" />
-              DEMO LAB
+              시연 모드
             </span>
-            <small>핵심 정책 시나리오</small>
+            <small>추천 규칙이 어떻게 동작하는지 직접 확인해 보세요</small>
           </legend>
           <div className="scenario-list">
             {scenarioOptions.map((option) => (

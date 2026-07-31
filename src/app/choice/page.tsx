@@ -18,13 +18,21 @@ export default function ChoicePage() {
             title="지금 어떤 걸 보고 싶나요?"
             description="원하는 조건을 골라 주세요. 고른 조건은 추천이 끝날 때까지 그대로 지킵니다."
           />
-          <div className="choice-progress" aria-label="추천 진행 1단계">
-            <span className="is-active">1</span>
-            <i />
-            <span>2</span>
-            <i />
-            <span>3</span>
-            <small>조건 선택 · 추천 확인 · 시청 결정</small>
+          {/* Static orientation copy. It must not read as live progress: the
+              CHOICE page cannot observe the later steps. */}
+          <div className="choice-guide">
+            <strong>이렇게 진행돼요</strong>
+            <ol>
+              <li>
+                <span>조건 고르기</span>
+              </li>
+              <li>
+                <span>추천 5편 확인</span>
+              </li>
+              <li>
+                <span>볼 작품 결정</span>
+              </li>
+            </ol>
           </div>
         </div>
         <ChoiceForm demoLabEnabled={config.appProfile === "demo"} />
