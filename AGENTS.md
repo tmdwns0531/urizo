@@ -113,6 +113,19 @@ responsibility are in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
   direction.
 - Every contributor, including the repository owner, branches from the latest
   accepted `dev`; personal work never starts directly on `dev` or `main`.
+- Before implementation, fetch and inspect `origin/dev`, then inspect every
+  open pull request targeting `dev`, including its changed-file list rather
+  than only its title or summary.
+- Compare the planned file and domain scope with both remote `dev` and open
+  pull requests. If they overlap, coordinate sequencing with the PR author and
+  single writer, reduce the scope, wait for the earlier PR, or create a small
+  owner-led prerequisite contract/schema PR before implementation.
+- Repeat the remote `dev` and open-PR overlap check before requesting review
+  and again before merge. Record the checked `origin/dev` commit, relevant PRs,
+  overlapping files, and coordination result in the pull request description.
+- If remote or GitHub access prevents this check, report the limitation and do
+  not claim the branch is conflict-free or expand beyond explicitly assigned
+  single-writer files.
 - Feature branch names must use
   `feature/<github-id>_<work-slug>_<version>`.
 - `<github-id>` is the contributor's exact GitHub login. `<work-slug>` uses

@@ -31,7 +31,7 @@ feature/member02_replacement-trace_v0.8.1
 
 ```bash
 git switch dev
-git fetch origin
+git fetch origin --prune
 git pull --ff-only origin dev
 git switch -c feature/<github-id>_<work-slug>_<version>
 
@@ -43,6 +43,64 @@ git push -u origin feature/<github-id>_<work-slug>_<version>
 
 push 후에는 feature branch에서 `dev`를 대상으로 pull request를 만든다.
 review와 필수 검사가 끝난 뒤 `dev`에 병합한다.
+
+## 작업 시작 전 원격 충돌 점검
+
+모든 작업자는 구현을 시작하기 전에 최신 원격 상태를 확인해야 한다. PR 제목만
+보지 말고 실제 변경 파일까지 확인하여 자신의 예정 작업과 겹치는지 판단한다.
+
+필수 점검 대상:
+
+1. `origin/dev`의 최신 commit과 자신의 로컬 `dev` 차이
+2. `dev`를 대상으로 열려 있는 모든 pull request
+3. 각 pull request의 변경 파일 목록
+4. 자신이 수정할 contract, migration, composition, 공용 UI와 테스트 파일
+
+원격 `dev`는 다음과 같이 갱신하고 확인한다.
+
+```bash
+git fetch origin --prune
+git log --oneline --decorate -n 15 origin/dev
+git diff --name-status dev..origin/dev
+```
+
+GitHub 웹의 Pull requests 화면에서 base branch가 `dev`인 열린 PR을 확인한다.
+GitHub CLI가 설치된 경우에는 다음 명령을 함께 사용할 수 있다.
+
+```bash
+gh pr list --base dev --state open --json number,title,headRefName,author,changedFiles
+gh pr view <pr-number> --json files
+```
+
+예정 파일이 열린 PR 또는 최신 `origin/dev` 변경과 겹치면 독립적으로 구현을
+진행하지 않는다. 아래 중 하나를 먼저 선택한다.
+
+- 기존 PR 작성자 및 해당 파일 단일 작성자와 수정 순서를 합의한다.
+- 겹치지 않는 파일·도메인으로 자신의 작업 범위를 줄인다.
+- 기존 PR을 먼저 병합한 뒤 최신 `origin/dev`에서 branch를 다시 정렬한다.
+- 공용 contract나 schema 변경을 단일 작성자의 작은 선행 PR로 분리한다.
+
+원격 또는 GitHub 접근 문제로 열린 PR 변경 파일을 확인하지 못했다면
+충돌이 없다고 간주하지 않는다. 확인하지 못한 범위를 작업자와 reviewer에게
+알리고, 확인될 때까지 자신의 명시된 단독 소유 파일 밖으로 작업을 넓히지 않는다.
+
+## PR 전 재점검과 기록
+
+구현 시작 시 충돌이 없었더라도 작업 중 다른 PR이 생성될 수 있다. 따라서
+review 요청 직전과 병합 직전에 위 점검을 다시 수행한다.
+
+PR 설명에는 최소한 아래 내용을 기록한다.
+
+```text
+- 확인한 origin/dev commit:
+- 확인한 dev 대상 열린 PR:
+- 중복 가능 파일 및 협의 결과:
+- 이번 PR의 단독 소유 파일:
+- contract/schema/composition 변경 여부:
+```
+
+열린 PR과 파일이 겹치는 경우, 합의 내용이나 선행 병합 관계가 PR 설명에
+없으면 review 및 병합을 진행하지 않는다.
 
 ## 공통 규칙
 
