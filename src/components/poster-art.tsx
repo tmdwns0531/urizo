@@ -16,7 +16,7 @@ export function PosterArt({
 }: {
   content: Pick<
     CatalogContent,
-    "id" | "title" | "backdropColor" | "releaseYear"
+    "id" | "title" | "backdropColor" | "releaseYear" | "posterUrl"
   >;
   priority?: boolean;
 }) {
@@ -29,10 +29,20 @@ export function PosterArt({
       role="img"
       aria-label={`${content.title} 데모 포스터`}
     >
+      {content.posterUrl ? (
+        <img
+          className="poster-art__image"
+          src={content.posterUrl}
+          alt=""
+          loading={priority ? "eager" : "lazy"}
+        />
+      ) : null}
       <span className="poster-art__grain" aria-hidden="true" />
-      <span className="poster-art__motif" aria-hidden="true">
-        {motif}
-      </span>
+      {content.posterUrl ? null : (
+        <span className="poster-art__motif" aria-hidden="true">
+          {motif}
+        </span>
+      )}
       <span className="poster-art__meta">OTT DAMOA · {content.releaseYear}</span>
       <strong>{content.title}</strong>
     </div>

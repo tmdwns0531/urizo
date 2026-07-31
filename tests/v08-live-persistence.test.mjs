@@ -1,32 +1,80 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
+const rootPath = path.resolve(import.meta.dirname, "..");
+const moduleCache = new Map();
 
 async function read(relativePath) {
   return readFile(new URL(relativePath, root), "utf8");
 }
 
+function resolveTypeScriptModule(fromPath, specifier) {
+  const base = path.resolve(path.dirname(fromPath), specifier);
+  for (const candidate of [
+    `${base}.ts`,
+    `${base}.tsx`,
+    path.join(base, "index.ts"),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`Cannot resolve ${specifier} from ${fromPath}`);
+}
+
+/**
+ * 상대 import 를 재귀적으로 data URL 로 바꿔 로드한다. normalization.ts 가
+ * ./tagging 을 참조하므로 단일 파일 transpile 로는 더 이상 로드되지 않는다.
+ */
+async function moduleDataUrl(relativePath) {
+  const absolutePath = path.resolve(rootPath, relativePath);
+  if (moduleCache.has(absolutePath)) return moduleCache.get(absolutePath);
+
+  const pending = (async () => {
+    const source = await readFile(absolutePath, "utf8");
+    const { outputText, diagnostics = [] } = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+      },
+      fileName: absolutePath,
+      reportDiagnostics: true,
+    });
+    assert.equal(
+      diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.category === ts.DiagnosticCategory.Error,
+      ).length,
+      0,
+    );
+    let output = outputText;
+    const matches = [
+      ...output.matchAll(/(?:from\s+|import\s+)(["'])(\.[^"']+)\1/g),
+    ];
+    for (const match of matches.reverse()) {
+      const specifier = match[2];
+      const specifierOffset = match[0].lastIndexOf(specifier);
+      const start = match.index + specifierOffset;
+      const dependency = resolveTypeScriptModule(absolutePath, specifier);
+      const dependencyUrl = await moduleDataUrl(
+        path.relative(rootPath, dependency),
+      );
+      output =
+        output.slice(0, start) +
+        dependencyUrl +
+        output.slice(start + specifier.length);
+    }
+    return `data:text/javascript;base64,${Buffer.from(output).toString("base64")}`;
+  })();
+  moduleCache.set(absolutePath, pending);
+  return pending;
+}
+
 async function loadStandaloneTypeScriptModule(relativePath) {
-  const source = await read(relativePath);
-  const { outputText, diagnostics = [] } = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-    reportDiagnostics: true,
-  });
-  assert.equal(
-    diagnostics.filter(
-      (diagnostic) =>
-        diagnostic.category === ts.DiagnosticCategory.Error,
-    ).length,
-    0,
-  );
-  const encoded = Buffer.from(outputText).toString("base64");
-  return import(`data:text/javascript;base64,${encoded}`);
+  return import(await moduleDataUrl(relativePath));
 }
 
 test("v0.8 migration is non-destructive, vectorized, and identity-free", async () => {

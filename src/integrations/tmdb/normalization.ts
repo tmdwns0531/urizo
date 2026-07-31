@@ -13,6 +13,11 @@ import type {
   TmdbTvDetail,
   TmdbWatchProvider,
 } from "./types";
+import {
+  deriveCompanionTags,
+  deriveMoodTags,
+  normalizeKeywords,
+} from "./tagging";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
@@ -351,6 +356,14 @@ export function normalizeTmdbDetail(
       ? (detail as TmdbMovieDetail).belongs_to_collection
       : null;
 
+  const genres = uniqueStrings((detail.genres ?? []).map((genre) => genre.name));
+  const keywords = normalizeKeywords(
+    (detail.keywords?.keywords ?? detail.keywords?.results ?? []).map(
+      (keyword) => keyword?.name ?? "",
+    ),
+  );
+  const ageRating = tmdbAgeRating(mediaKind, detail);
+
   return {
     ok: true,
     content: {
@@ -361,12 +374,10 @@ export function normalizeTmdbDetail(
       mediaType: mediaTypeFor(mediaKind),
       runtimeMinutes,
       releaseYear,
-      genres: uniqueStrings(
-        (detail.genres ?? []).map((genre) => genre.name),
-      ),
-      moodTags: [],
-      companionTags: [],
-      ageRating: tmdbAgeRating(mediaKind, detail),
+      genres,
+      moodTags: deriveMoodTags(keywords, genres),
+      companionTags: deriveCompanionTags(keywords, genres, ageRating),
+      ageRating,
       originCountries: countries.origin,
       productionCountries: countries.production,
       providers,
