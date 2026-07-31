@@ -222,10 +222,10 @@ export interface StoredRecommendationRun {
   id: string;
   status: RunLifecycleStatus;
   revision: number;
-  executionMode: ExecutionMode;
-  inputFingerprint: InputFingerprint;
+  executionMode: ExecutionMode | null;
+  inputFingerprint: InputFingerprint | null;
   requestSnapshot: SanitizedRecommendationSearchInput;
-  queryVector: QueryVectorSnapshot;
+  queryVector: QueryVectorSnapshot | null;
   responseSnapshot: StoredResponseSnapshot | null;
   excludedContentIds: string[];
   replacedContentIds: string[];
@@ -244,6 +244,73 @@ export interface StoredRecommendationRun {
   updatedAt: string;
 }
 
+export type MaterializedStoredRecommendationRun =
+  StoredRecommendationRun & {
+    executionMode: ExecutionMode;
+    inputFingerprint: InputFingerprint;
+    queryVector: QueryVectorSnapshot;
+  };
+
+export function isMaterializedStoredRecommendationRun(
+  run: StoredRecommendationRun,
+): run is MaterializedStoredRecommendationRun {
+  return (
+    run.executionMode !== null &&
+    run.inputFingerprint !== null &&
+    run.queryVector !== null
+  );
+}
+
+export function assertStoredRecommendationRunState(
+  run: StoredRecommendationRun,
+): void {
+  const materialized = isMaterializedStoredRecommendationRun(run);
+
+  if (run.status === "RUNNING") {
+    if (
+      run.responseSnapshot !== null ||
+      run.errorCode !== null ||
+      run.completedAt !== null
+    ) {
+      throw new TypeError("RUNNING recommendation state is invalid.");
+    }
+    return;
+  }
+
+  if (run.status === "AWAITING_APPROVAL") {
+    if (
+      !materialized ||
+      run.responseSnapshot?.status !== "awaiting_approval" ||
+      run.errorCode !== null ||
+      run.completedAt !== null
+    ) {
+      throw new TypeError("AWAITING_APPROVAL recommendation state is invalid.");
+    }
+    return;
+  }
+
+  if (run.status === "COMPLETED") {
+    if (
+      !materialized ||
+      run.responseSnapshot?.status !== "completed" ||
+      run.errorCode !== null ||
+      run.completedAt === null
+    ) {
+      throw new TypeError("COMPLETED recommendation state is invalid.");
+    }
+    return;
+  }
+
+  if (
+    run.status !== "FAILED" ||
+    run.responseSnapshot !== null ||
+    run.errorCode === null ||
+    !PUBLIC_ERROR_CODES.includes(run.errorCode) ||
+    run.completedAt === null
+  ) {
+    throw new TypeError("FAILED recommendation state is invalid.");
+  }
+}
 export type StoredRecommendationRunPatch = Partial<
   Omit<StoredRecommendationRun, "id" | "revision" | "createdAt">
 >;

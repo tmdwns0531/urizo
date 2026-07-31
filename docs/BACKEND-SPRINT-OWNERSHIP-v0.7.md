@@ -339,8 +339,12 @@ SHA-256(canonicalJson({
 
 - canonical JSON은 key를 정렬하고 의미상 순서가 없는 배열도 정렬하며 UTF-8과
   lowercase hex를 사용한다.
-- 승인으로 effective runtime이 45분이 되어도 최초 fingerprint를 재계산하지
-  않는다.
+- v0.7 baseline에서는 승인으로 effective runtime이 45분이 되어도 최초
+  fingerprint를 재계산하지 않는다.
+- v0.8 익명 runtime은 continuation 무결성을 위해 이 한 규칙을 의도적으로
+  대체한다. Demo와 LIVE 모두 승인된 sanitized input과 기존 vector로 새
+  fingerprint를 계산하고, vector embedding 자체는 재생성하지 않는다. 자세한
+  권한 문구는 `OTT-DAMOA-LIVE-MVP-v0.8.md` 1절과 5절을 따른다.
 
 ### 2.4 공개 응답·내부 실행 상태 계약
 

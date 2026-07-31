@@ -2,12 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Companion, OriginPreference } from "@/contracts/search";
+import type { OttProvider } from "@/contracts/catalog";
 import type {
-  DemoScenario,
-  RecommendationRequest,
-} from "@/contracts/recommendation";
+  ChoiceRuntimeMinutes,
+  Companion,
+  Mood,
+  MvpDemoRecommendationRequest,
+  MvpDemoScenario as DemoScenario,
+  OriginPreference,
+} from "@/contracts/mvp-search";
 import { ProviderBadge } from "./provider-badge";
+
+const providerOptions: Array<{ value: OttProvider; label: string }> = [
+  { value: "NETFLIX", label: "Netflix" },
+  { value: "TVING", label: "TVING" },
+  { value: "DISNEY_PLUS", label: "Disney+" },
+  { value: "WAVVE", label: "Wavve" },
+  { value: "WATCHA", label: "WATCHA" },
+  { value: "COUPANG_PLAY", label: "Coupang Play" },
+];
 
 const companionOptions: Array<{
   value: Companion;
@@ -22,7 +35,7 @@ const companionOptions: Array<{
   { value: "ANY", label: "상관없음", icon: "∞" },
 ];
 
-const moodOptions = [
+const moodOptions: Array<{ value: Mood; label: string; icon: string }> = [
   { value: "밝은", label: "즐겁게 웃고 싶어요", icon: "☀" },
   { value: "따뜻한", label: "위로받고 싶어요", icon: "♡" },
   { value: "감성적인", label: "감성에 젖고 싶어요", icon: "☂" },
@@ -89,19 +102,24 @@ const scenarioOptions: Array<{
 
 const avoidGenreOptions = ["공포", "액션", "로맨스", "범죄", "다큐멘터리"];
 
-function toggleValue(values: string[], value: string) {
+function toggleValue<T extends string>(values: T[], value: T): T[] {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value];
 }
 
-export function ChoiceForm() {
+type ChoiceFormProps = {
+  demoLabEnabled: boolean;
+};
+
+export function ChoiceForm({ demoLabEnabled }: ChoiceFormProps) {
   const router = useRouter();
-  const [companion, setCompanion] = useState<Companion>("ALONE");
-  const [moods, setMoods] = useState<string[]>(["긴장감 있는"]);
-  const [maxRuntime, setMaxRuntime] = useState<number | null>(120);
+  const [selectedProviders, setSelectedProviders] = useState<OttProvider[]>([]);
+  const [companion, setCompanion] = useState<Companion>("ANY");
+  const [moods, setMoods] = useState<Mood[]>([]);
+  const [maxRuntime, setMaxRuntime] = useState<ChoiceRuntimeMinutes>(null);
   const [runtimeBeforeApproval, setRuntimeBeforeApproval] =
-    useState<number | null>(120);
+    useState<ChoiceRuntimeMinutes>(null);
   const [origin, setOrigin] = useState<OriginPreference>("ANY");
   const [naturalLanguage, setNaturalLanguage] = useState("");
   const [avoidGenre, setAvoidGenre] = useState("");
@@ -128,15 +146,20 @@ export function ChoiceForm() {
     setIsSubmitting(true);
     setError("");
 
-    const request: RecommendationRequest = {
-      scenario,
+    const request: MvpDemoRecommendationRequest = {
+      ...(demoLabEnabled && scenario !== "normal" ? { scenario } : {}),
       choice: {
+        selectedProviders,
         companions: [companion],
         moods,
         maxRuntimeMinutes: scenario === "approval" ? 30 : maxRuntime,
         originPreference: origin,
         naturalLanguage: naturalLanguage.trim(),
-        companionAvoidGenres: avoidGenre ? [avoidGenre] : [],
+        companionAvoidGenres:
+          (companion === "PARTNER" || companion === "FRIENDS") &&
+          avoidGenre
+            ? [avoidGenre]
+            : [],
       },
     };
 
@@ -166,6 +189,36 @@ export function ChoiceForm() {
   return (
     <div className="choice-layout">
       <div className="choice-main">
+        <fieldset className="choice-section">
+          <legend>
+            <span>OTT</span>
+            <span>
+              <strong>이번에 볼 수 있는 OTT는 어디인가요?</strong>
+              <small>여러 개 선택 · 미선택 시 전체</small>
+            </span>
+          </legend>
+          <div className="choice-card-grid choice-card-grid--six">
+            {providerOptions.map((option) => (
+              <label
+                className={`choice-card${selectedProviders.includes(option.value) ? " is-selected" : ""}`}
+                key={option.value}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedProviders.includes(option.value)}
+                  onChange={() =>
+                    setSelectedProviders(
+                      toggleValue(selectedProviders, option.value),
+                    )
+                  }
+                />
+                <ProviderBadge provider={option.value} compact />
+                <strong>{option.label}</strong>
+                <i aria-hidden="true">✓</i>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <fieldset className="choice-section">
           <legend>
             <span>01</span>
@@ -356,7 +409,7 @@ export function ChoiceForm() {
             </div>
             <div>
               <dt>기분</dt>
-              <dd>{moods.length ? moods.join(", ") : "프로필 기준"}</dd>
+              <dd>{moods.length ? moods.join(", ") : "상관없음"}</dd>
             </div>
             <div>
               <dt>시간</dt>
@@ -376,11 +429,16 @@ export function ChoiceForm() {
             </div>
           </dl>
           <div className="summary-providers">
-            <span>구독 OTT 안에서</span>
+            <span>
+              {selectedProviders.length ? "선택 OTT 안에서" : "모든 지원 OTT에서"}
+            </span>
             <div>
-              <ProviderBadge provider="NETFLIX" compact />
-              <ProviderBadge provider="TVING" compact />
-              <ProviderBadge provider="DISNEY_PLUS" compact />
+              {(selectedProviders.length
+                ? selectedProviders
+                : providerOptions.map((option) => option.value)
+              ).map((provider) => (
+                <ProviderBadge provider={provider} compact key={provider} />
+              ))}
             </div>
           </div>
           <div className="policy-promise">
@@ -403,7 +461,8 @@ export function ChoiceForm() {
           </div>
         </section>
 
-        <fieldset className="demo-lab">
+        {demoLabEnabled ? (
+          <fieldset className="demo-lab">
           <legend>
             <span>
               <span className="demo-live-dot" />
@@ -438,7 +497,8 @@ export function ChoiceForm() {
             현재: <strong>{selectedScenario.label}</strong> ·{" "}
             {selectedScenario.description}
           </p>
-        </fieldset>
+          </fieldset>
+        ) : null}
       </aside>
     </div>
   );

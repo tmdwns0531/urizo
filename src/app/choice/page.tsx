@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AppShell, PageIntro } from "@/components/app-shell";
 import { ChoiceForm } from "@/components/choice-form";
+import { readMvpAdapterConfig } from "@/config/adapters";
 
 export const metadata: Metadata = {
   title: "CHOICE",
 };
 
 export default function ChoicePage() {
+  const config = readMvpAdapterConfig();
   return (
     <AppShell active="choice">
       <div className="page-shell">
@@ -25,7 +27,7 @@ export default function ChoicePage() {
             <small>조건 선택 · 추천 확인 · 시청 결정</small>
           </div>
         </div>
-        <ChoiceForm />
+        <ChoiceForm demoLabEnabled={config.appProfile === "demo"} />
       </div>
     </AppShell>
   );

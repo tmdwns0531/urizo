@@ -1,5 +1,21 @@
-generator client {
-  provider = "prisma-client-js"
+generator workerdClient {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma-workerd"
+  runtime                = "workerd"
+  engineType             = "client"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
+}
+
+generator nodeClient {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma-node"
+  runtime                = "nodejs"
+  engineType             = "client"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
 }
 
 datasource db {
@@ -42,14 +58,44 @@ enum TraceAction {
   complete
 }
 
+enum CatalogMediaType {
+  MOVIE
+  SERIES
+}
+
+enum CatalogAgeRating {
+  ALL
+  SEVEN @map("7")
+  TWELVE @map("12")
+  FIFTEEN @map("15")
+  EIGHTEEN @map("18")
+  UNKNOWN
+}
+
+enum CatalogProvider {
+  NETFLIX
+  TVING
+  DISNEY_PLUS
+  WAVVE
+  WATCHA
+  COUPANG_PLAY
+}
+
+enum CatalogProviderLinkType {
+  DIRECT
+  SEARCH
+  HOME
+}
+
 model RecommendationRun {
   id                 String                      @id @db.VarChar(64)
   status             RecommendationRunStatus     @default(RUNNING)
   revision           Int                         @default(0)
-  executionMode      RecommendationExecutionMode @default(DETERMINISTIC) @map("execution_mode")
-  inputFingerprint   String                      @map("input_fingerprint") @db.VarChar(71)
+  nextTraceSequence  Int                         @default(1) @map("next_trace_sequence")
+  executionMode      RecommendationExecutionMode? @map("execution_mode")
+  inputFingerprint   String?                     @map("input_fingerprint") @db.VarChar(71)
   requestSnapshot    Json                        @map("request_snapshot")
-  queryVector        Json                        @map("query_vector")
+  queryVector        Json?                       @map("query_vector")
   responseSnapshot   Json?                       @map("response_snapshot")
   excludedContentIds String[]                    @default([]) @map("excluded_content_ids")
   replacedContentIds String[]                    @default([]) @map("replaced_content_ids")
@@ -90,4 +136,84 @@ model AgentTrace {
   @@unique([runId, sequence], map: "agent_traces_run_sequence_key")
   @@index([runId, visibility, sequence], map: "agent_traces_run_visibility_idx")
   @@map("agent_traces")
+}
+
+model CatalogContent {
+  id                  String           @id @db.VarChar(64)
+  tmdbId              Int              @map("tmdb_id")
+  mediaType           CatalogMediaType @map("media_type")
+  title               String           @db.Text
+  synopsis            String           @db.Text
+  runtimeMinutes      Int              @map("runtime_minutes")
+  releaseYear         Int              @map("release_year")
+  genres              String[]         @default([])
+  moodTags            String[]         @default([]) @map("mood_tags")
+  companionTags       String[]         @default([]) @map("companion_tags")
+  ageRating           CatalogAgeRating @default(UNKNOWN) @map("age_rating")
+  originCountries     String[]         @default([]) @map("origin_countries")
+  productionCountries String[]         @default([]) @map("production_countries")
+  collectionId        String?          @map("collection_id") @db.VarChar(64)
+  voteAverage         Float            @default(0) @map("vote_average") @db.DoublePrecision
+  voteCount           Int              @default(0) @map("vote_count")
+  posterUrl           String?          @map("poster_url") @db.Text
+  backdropColor       String           @map("backdrop_color") @db.VarChar(16)
+  isActive             Boolean          @default(true) @map("is_active")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  providers       ProviderAvailability[]
+  searchDocuments ContentSearchDocument[]
+
+  @@unique([tmdbId, mediaType], map: "catalog_contents_tmdb_media_key")
+  @@index([isActive, mediaType], map: "catalog_contents_active_media_idx")
+  @@map("catalog_contents")
+}
+
+model ProviderAvailability {
+  contentId String                  @map("content_id") @db.VarChar(64)
+  provider  CatalogProvider
+  watchUrl  String                  @map("watch_url") @db.Text
+  linkType  CatalogProviderLinkType @map("link_type")
+  createdAt DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  content CatalogContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, provider], map: "provider_availabilities_pkey")
+  @@index([provider, contentId], map: "provider_availabilities_provider_content_idx")
+  @@map("provider_availabilities")
+}
+
+model ContentSearchDocument {
+  id           String   @id @db.VarChar(64)
+  contentId    String   @map("content_id") @db.VarChar(64)
+  locale       String   @default("ko-KR") @db.VarChar(16)
+  documentText String   @map("document_text") @db.Text
+  contentHash  String   @map("content_hash") @db.Char(64)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  content    CatalogContent    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  embeddings ContentEmbedding[]
+
+  @@unique([contentId, contentHash], map: "content_search_documents_content_hash_key")
+  @@index([contentId, isActive], map: "content_search_documents_content_active_idx")
+  @@map("content_search_documents")
+}
+
+model ContentEmbedding {
+  id               String                      @id @db.VarChar(64)
+  searchDocumentId String                      @map("search_document_id") @db.VarChar(64)
+  model            String                      @db.VarChar(64)
+  dimensions       Int                         @default(1536)
+  embedding        Unsupported("vector(1536)")
+  createdAt        DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  searchDocument ContentSearchDocument @relation(fields: [searchDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([searchDocumentId, model], map: "content_embeddings_document_model_key")
+  @@index([searchDocumentId], map: "content_embeddings_document_idx")
+  @@map("content_embeddings")
 }

@@ -32,9 +32,10 @@ export interface HealthResponse {
   status: HealthStatus;
   mode: HealthMode;
   fullyDemo: boolean;
+  fullyLive: boolean;
   adapters: {
-    catalog: "fixture";
-    search: "local";
+    catalog: "fixture" | "prisma";
+    search: "local" | "pgvector";
     selector: "deterministic" | "openai";
     runStore: "memory" | "prisma";
     traceStore: "memory" | "prisma";

@@ -19,14 +19,14 @@ export interface AdapterConfig {
 
 export interface MvpAdapterConfig {
   appProfile: "demo" | "live";
-  catalog: "fixture";
-  search: "local";
+  catalog: "fixture" | "prisma";
+  search: "local" | "pgvector";
   selector: "deterministic" | "openai";
   runStore: "memory" | "prisma";
   traceStore: "memory" | "prisma";
 }
 
-export const MVP_DEFAULT_ADAPTER_CONFIG = {
+export const MVP_DEMO_ADAPTER_CONFIG = {
   appProfile: "demo",
   catalog: "fixture",
   search: "local",
@@ -34,6 +34,17 @@ export const MVP_DEFAULT_ADAPTER_CONFIG = {
   runStore: "memory",
   traceStore: "memory",
 } as const satisfies MvpAdapterConfig;
+
+export const MVP_LIVE_ADAPTER_CONFIG = {
+  appProfile: "live",
+  catalog: "prisma",
+  search: "pgvector",
+  selector: "openai",
+  runStore: "prisma",
+  traceStore: "prisma",
+} as const satisfies MvpAdapterConfig;
+
+export const MVP_DEFAULT_ADAPTER_CONFIG = MVP_DEMO_ADAPTER_CONFIG;
 
 type Environment = Record<string, string | undefined>;
 
@@ -43,7 +54,7 @@ const choices = <T extends string>(
   allowed: readonly T[],
   name: string,
 ): T => {
-  const selected = (value ?? fallback) as T;
+  const selected = (value?.trim() || fallback) as T;
   if (!allowed.includes(selected)) {
     throw new Error(
       `${name} must be one of ${allowed.join(", ")}; received "${selected}".`,
@@ -98,56 +109,82 @@ export function readAdapterConfig(
 }
 
 /**
- * Reads only selectors that exist in the v0.6 anonymous MVP. Catalog and
- * search are intentionally fixed to the credential-free baseline adapters.
+ * Reads the v0.8 anonymous MVP selectors. The internal local-live override
+ * deliberately ignores per-capability Demo selectors and selects the full LIVE preset.
  */
 export function readMvpAdapterConfig(
   env: Environment = process.env,
 ): MvpAdapterConfig {
-  return {
-    appProfile: choices(
-      env.APP_PROFILE,
-      "demo",
-      ["demo", "live"],
-      "APP_PROFILE",
-    ),
+  const forceLivePreset =
+    env.OTT_DAMOA_PROFILE_OVERRIDE?.trim() === "live";
+  if (forceLivePreset) {
+    return { ...MVP_LIVE_ADAPTER_CONFIG };
+  }
+
+  const appProfile = choices(
+    env.APP_PROFILE,
+    "demo",
+    ["demo", "live"],
+    "APP_PROFILE",
+  );
+  const defaults =
+    appProfile === "live"
+      ? MVP_LIVE_ADAPTER_CONFIG
+      : MVP_DEMO_ADAPTER_CONFIG;
+  const config = {
+    appProfile,
     catalog: choices(
       env.CATALOG_ADAPTER,
-      "fixture",
-      ["fixture"],
+      defaults.catalog,
+      ["fixture", "prisma"],
       "CATALOG_ADAPTER",
     ),
     search: choices(
       env.SEARCH_ADAPTER,
-      "local",
-      ["local"],
+      defaults.search,
+      ["local", "pgvector"],
       "SEARCH_ADAPTER",
     ),
     selector: choices(
       env.SELECTOR_ADAPTER,
-      "deterministic",
+      defaults.selector,
       ["deterministic", "openai"],
       "SELECTOR_ADAPTER",
     ),
     runStore: choices(
       env.RUN_STORE,
-      "memory",
+      defaults.runStore,
       ["memory", "prisma"],
       "RUN_STORE",
     ),
     traceStore: choices(
       env.TRACE_STORE,
-      "memory",
+      defaults.traceStore,
       ["memory", "prisma"],
       "TRACE_STORE",
     ),
-  };
+  } satisfies MvpAdapterConfig;
+  if (config.search === "pgvector" && config.catalog !== "prisma") {
+    throw new Error(
+      "SEARCH_ADAPTER=pgvector requires CATALOG_ADAPTER=prisma.",
+    );
+  }
+  if (config.traceStore === "prisma" && config.runStore !== "prisma") {
+    throw new Error(
+      "TRACE_STORE=prisma requires RUN_STORE=prisma.",
+    );
+  }
+  if (config.runStore === "prisma" && config.traceStore !== "prisma") {
+    throw new Error(
+      "RUN_STORE=prisma requires TRACE_STORE=prisma.",
+    );
+  }
+  return config;
 }
-
 /**
  * Runtime validation for the selected anonymous-MVP adapters. Validation-only
- * Prisma CLI placeholders are never accepted here: a selected Prisma store
- * still requires the caller's real DATABASE_URL and DIRECT_URL values.
+ * Prisma CLI placeholders are never accepted here: a selected Prisma runtime
+ * requires DATABASE_URL. DIRECT_URL remains migration-only.
  */
 export function validateSelectedMvpAdapters(
   config: MvpAdapterConfig,
@@ -155,18 +192,44 @@ export function validateSelectedMvpAdapters(
 ): void {
   const required = new Set<string>();
 
-  if (config.runStore === "prisma" || config.traceStore === "prisma") {
+  const usesPrisma =
+    config.catalog === "prisma" ||
+    config.search === "pgvector" ||
+    config.runStore === "prisma" ||
+    config.traceStore === "prisma";
+  if (usesPrisma) {
     required.add("DATABASE_URL");
-    required.add("DIRECT_URL");
+  }
+  if (config.search === "pgvector") {
+    required.add("OPENAI_API_KEY");
+    required.add("OPENAI_EMBEDDING_MODEL");
+    required.add("OPENAI_EMBEDDING_DIMENSIONS");
   }
   if (config.selector === "openai") {
     required.add("OPENAI_API_KEY");
+    required.add("OPENAI_GENERATION_MODEL");
   }
 
   const missing = [...required].filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(
       `Selected MVP adapters require environment variables: ${missing.join(", ")}.`,
+    );
+  }
+  if (
+    config.search === "pgvector" &&
+    env.OPENAI_EMBEDDING_MODEL?.trim() !== "text-embedding-3-small"
+  ) {
+    throw new Error(
+      "OPENAI_EMBEDDING_MODEL must be text-embedding-3-small for pgvector search.",
+    );
+  }
+  if (
+    config.search === "pgvector" &&
+    Number(env.OPENAI_EMBEDDING_DIMENSIONS) !== 1536
+  ) {
+    throw new Error(
+      "OPENAI_EMBEDDING_DIMENSIONS must be exactly 1536 for pgvector search.",
     );
   }
 }
@@ -230,5 +293,17 @@ export function isFullyMvpDemoConfig(
     config.selector === "deterministic" &&
     config.runStore === "memory" &&
     config.traceStore === "memory"
+  );
+}
+
+export function isFullyMvpLiveConfig(
+  config: MvpAdapterConfig,
+): boolean {
+  return (
+    config.catalog === "prisma" &&
+    config.search === "pgvector" &&
+    config.selector === "openai" &&
+    config.runStore === "prisma" &&
+    config.traceStore === "prisma"
   );
 }

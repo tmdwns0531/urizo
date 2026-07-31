@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 type AppShellProps = {
   children: ReactNode;
-  active?: "choice" | "my";
+  active?: "choice";
   minimal?: boolean;
 };
 
@@ -28,33 +28,6 @@ export function AppShell({
   active,
   minimal = false,
 }: AppShellProps) {
-  const [displayName, setDisplayName] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void fetch("/api/users/profile", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as { displayName?: string };
-      })
-      .then((profile) => {
-        if (!cancelled && profile?.displayName) {
-          setDisplayName(profile.displayName);
-        }
-      })
-      .catch(() => {
-        // The shell remains usable with the Demo fallback label.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const profileLabel = displayName || "Demo";
-  const profileInitial = profileLabel.trim().slice(0, 1).toUpperCase() || "D";
-
   return (
     <div className="app-frame">
       <header className="site-header">
@@ -72,21 +45,14 @@ export function AppShell({
                 >
                   CHOICE
                 </Link>
-                <Link
-                  href="/my"
-                  className={active === "my" ? "is-active" : undefined}
-                >
-                  MY
-                </Link>
               </nav>
               <div className="header-actions">
                 <span className="demo-pill">
                   <span className="demo-pill__dot" />
-                  로컬 Demo
+                  익명 추천
                 </span>
-                <Link href="/my" className="profile-chip" aria-label="MY 프로필">
-                  <span aria-hidden="true">{profileInitial}</span>
-                  <strong>{profileLabel}</strong>
+                <Link href="/choice" className="text-link">
+                  새 추천 받기
                 </Link>
               </div>
             </>
@@ -108,13 +74,6 @@ export function AppShell({
           >
             <span aria-hidden="true">✦</span>
             추천받기
-          </Link>
-          <Link
-            href="/my"
-            className={active === "my" ? "is-active" : undefined}
-          >
-            <span aria-hidden="true">●</span>
-            MY
           </Link>
         </nav>
       ) : null}

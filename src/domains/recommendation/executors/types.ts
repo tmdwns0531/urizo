@@ -1,4 +1,3 @@
-import type { RecommendationItem } from "../../../contracts/recommendation";
 import type {
   BudgetSnapshot,
   FallbackReason,
@@ -6,23 +5,23 @@ import type {
   RuleBasedFallbackInput,
 } from "../../../contracts/mvp-recommendation";
 import type { RecommendationSearchInvocation } from "../../../contracts/mvp-search";
-import type { SearchInput } from "../../../contracts/search";
-import type { UserContext } from "../../../contracts/user";
+import type { RecommendationItem } from "../../../contracts/recommendation";
 import type { BudgetCounter } from "../budget";
-import type { ResolvedRecommendationRequest } from "../request";
-import type { PublicTraceWriter } from "../trace";
 
-/** @deprecated Use MvpRecommendationExecutionContext. */
+/**
+ * @deprecated Compile-only compatibility for the deferred agent extension
+ * seam. Active runtime code must use MvpRecommendationExecutionContext.
+ */
 export interface RecommendationExecutionContext {
   runId: string;
-  user: UserContext;
-  request: ResolvedRecommendationRequest;
-  searchInput: SearchInput;
   budget: BudgetCounter;
-  trace: PublicTraceWriter;
+  readonly [key: string]: unknown;
 }
 
-/** @deprecated Use MvpRecommendationExecutionResult. */
+/**
+ * @deprecated Compile-only compatibility for the deferred agent extension
+ * seam. Active runtime code must use MvpRecommendationExecutionResult.
+ */
 export interface RecommendationExecutionResult {
   ranked: RecommendationItem[];
   selected: RecommendationItem[];
@@ -30,7 +29,10 @@ export interface RecommendationExecutionResult {
   eligibleCount: number;
 }
 
-/** @deprecated Use MvpRecommendationExecutor. */
+/**
+ * @deprecated Compile-only compatibility for the deferred agent extension
+ * seam. Active runtime code must use MvpRecommendationExecutor.
+ */
 export interface RecommendationExecutor {
   execute(
     context: RecommendationExecutionContext,
@@ -50,10 +52,13 @@ export type ExecutionAttempt =
       fallbackInput: RuleBasedFallbackInput;
     };
 
+export type RecommendationSelectionMode = "configured" | "ranked";
+
 export interface MvpRecommendationExecutionContext {
   runId: string;
   searchInvocation: RecommendationSearchInvocation;
   budget: BudgetCounter;
+  selectionMode: RecommendationSelectionMode;
 }
 
 export interface MvpRecommendationExecutor {

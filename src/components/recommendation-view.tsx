@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  ApprovalDecision,
-  AwaitingApprovalRecommendationResponse,
-  CompletedRecommendationResponse,
-  RecommendationResponse,
-} from "@/contracts/recommendation";
+  MvpApprovalDecision as ApprovalDecision,
+  MvpAwaitingApprovalRecommendationResponse as AwaitingApprovalRecommendationResponse,
+  MvpCompletedRecommendationResponse as CompletedRecommendationResponse,
+  MvpRecommendationResponse as RecommendationResponse,
+} from "@/contracts/mvp-recommendation";
 import { ContentCard } from "./content-card";
 
 type RecommendationViewProps = {
@@ -54,8 +54,8 @@ function Timeline({ response }: { response: RecommendationResponse }) {
         ))}
       </ol>
       <div className="trace-panel__foot">
-        <span>Demo 실행 상세</span>
-        <code>fixture · local · deterministic · memory</code>
+        <span>추천 실행 상세</span>
+        <code>필터 · 검색 · 선택 · 정책 · Trace</code>
       </div>
     </details>
   );
@@ -136,7 +136,6 @@ function ApprovalView({
             <ContentCard
               item={item}
               rank={index + 1}
-              runId={response.runId}
               key={item.content.id}
             />
           ))}
@@ -221,7 +220,6 @@ function CompletedView({
           <ContentCard
             item={response.topPick}
             rank={1}
-            runId={response.runId}
             hero
             onReplace={onReplace}
             replacing={replacingId === response.topPick.content.id}
@@ -254,8 +252,7 @@ function CompletedView({
               <ContentCard
                 item={item}
                 rank={index + 2}
-                runId={response.runId}
-                key={item.content.id}
+                  key={item.content.id}
                 onReplace={onReplace}
                 replacing={replacingId === item.content.id}
                 replacementPending={replacingId !== null}
@@ -389,6 +386,16 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
   async function replace(contentId: string) {
     if (replacementLock.current) return;
     replacementLock.current = true;
+    try {
+      const storageKey = "ott-damoa:not-interested";
+      const current = JSON.parse(sessionStorage.getItem(storageKey) ?? "[]") as unknown;
+      const values = Array.isArray(current)
+        ? current.filter((value): value is string => typeof value === "string")
+        : [];
+      sessionStorage.setItem(storageKey, JSON.stringify([...new Set([...values, contentId])]));
+    } catch {
+      // Replacement remains available when browser storage is unavailable.
+    }
     setReplacingId(contentId);
     setAnnouncement("같은 조건의 안전한 교체 후보를 찾고 있어요.");
     try {
@@ -446,7 +453,7 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
       <div className="empty-state empty-state--error">
         <span aria-hidden="true">!</span>
         <h1>추천 기록을 불러오지 못했어요.</h1>
-        <p>{error || "Demo 세션이 초기화되었을 수 있어요."}</p>
+        <p>{error || "추천 기록이 만료되었거나 저장소에 없을 수 있어요."}</p>
         <div>
           <button
             className="button button--ghost"

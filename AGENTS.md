@@ -2,21 +2,27 @@
 
 ## Authority and current status
 
-- Product scope and acceptance source: `docs/OTT-DAMOA-MVP-v0.6.md`
+- LIVE extension and acceptance source:
+  `docs/OTT-DAMOA-LIVE-MVP-v0.8.md`
+- Demo product scope and acceptance source: `docs/OTT-DAMOA-MVP-v0.6.md`
 - Five-person execution and ownership source:
   `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`
-- Persistence source: `docs/ERD-v0.7-baseline.md`,
+- Persistence source: `docs/ERD-v0.8-live.md`,
+  `docs/ERD-v0.7-baseline.md`,
   `prisma/schema.prisma`, and `prisma/migrations/**`
 - `docs/ARCHITECTURE.md` and `docs/TEAM-OWNERSHIP.md` summarize those sources
   and have lower priority.
 
-The v0.7 Day 1 baseline provides the anonymous-MVP contracts, adapter/config
-types, composition types, and Run·Trace-only Prisma schema/migration. The
-existing Demo runtime still uses deprecated authentication/profile/engagement
-contracts while the five vertical slices are developed. That transitional code
-is a compile/run compatibility path, not the target product scope. Do not add
-new login, profile, MY, saved, watched, or backend not-interested behavior.
-Removal belongs to the ordered role work in the v0.7 ownership document.
+The v0.7 anonymous contracts are the active runtime boundary. The Demo and LIVE
+profiles both use the anonymous CHOICE, RecommendationRun, and AgentTrace flow.
+Deprecated authentication/profile/engagement types may remain only as compile
+compatibility while shared-contract cleanup is coordinated. Do not add login,
+profile, MY, saved, watched, or backend not-interested behavior.
+
+The v0.8 LIVE extension adds Prisma catalog storage, offline TMDB ingestion,
+OpenAI embeddings with pgvector search, and an OpenAI selector. It does not
+reintroduce identity or engagement. Keep the v0.6 credential-free Demo as a
+first-class preset.
 
 ## Start here
 
@@ -28,6 +34,8 @@ Removal belongs to the ordered role work in the v0.7 ownership document.
 
 The default Demo must run without credentials, a database, Supabase, pgvector,
 or OpenAI.
+Use `npm run dev:live` only for authorized local LIVE testing; its Node wrapper
+forces the full LIVE preset without relying on an unsupported Vinext `--mode` flag.
 
 ## Required checks
 
@@ -40,13 +48,10 @@ Before handing work off, run:
 - `npm run build`
 
 `db:validate` uses a local validation-only URL inside the Prisma CLI child
-process and does not connect to a database. Selecting a real Prisma Run or
-Trace store still requires actual `DATABASE_URL` and `DIRECT_URL` values at the
-runtime config boundary.
+process and does not connect to a database. Selecting a Prisma runtime adapter requires actual `DATABASE_URL`; migration commands require both `DATABASE_URL` and `DIRECT_URL`.
 
-The current integration suite retains legacy Demo regression coverage until
-the vertical-slice cleanup merges. `tests/baseline-contract.test.mjs` and
-`tests/v07-baseline.type-test.ts` are the v0.7 baseline gates.
+The integration suite covers the anonymous Demo regression flow and v0.8 LIVE
+adapter contracts while retaining the accepted v0.7 contract gates.
 
 ## Architecture invariants
 
@@ -62,14 +67,33 @@ the vertical-slice cleanup merges. `tests/baseline-contract.test.mjs` and
   tool-registry, final-filter, and Trace boundaries.
 - Never weaken age, provider, runtime, origin, exclusion, replacement, or final
   safety filters to make a test pass.
-- The active Prisma schema contains only `RecommendationRun` and `AgentTrace`.
+- The active Prisma schema contains `RecommendationRun`, `AgentTrace`, and
+  only the catalog/provider/search-document/embedding models authorized by the
+  v0.8 LIVE ERD.
 - Never persist user identity, natural-language source text, raw tokens,
   matched terms, prompts, secrets, or backend engagement state in Run/Trace.
+- TMDB is an ingestion pipeline, never a recommendation-request dependency.
+- pgvector queries are parameterized and limited to catalog-eligibility IDs.
 
 Read `docs/ARCHITECTURE.md` before changing a shared contract or composition
 boundary.
 
-## Active v0.7 ownership
+## Active ownership
+
+The v0.7 five-person vertical ownership remains the team baseline. The v0.8
+LIVE module boundaries are additive:
+
+- 1: LIVE preset, conditional environment validation, composition, health,
+  integration, release
+- 2: Prisma catalog schema/repository, TMDB ingestion, migrations
+- 3: OpenAI embedding, pgvector search, vector continuation
+- 4: OpenAI selector, model budget, deterministic fallback
+- 5: final policy, Prisma Trace, approval/replacement continuation
+
+The detailed v0.8 team allocation document may refine workload and branch
+names, but it must preserve these single-writer boundaries.
+
+The active v0.7 responsibilities remain:
 
 - 1: Anonymous Platform, Run lifecycle, composition, health/reset, release
 - 2: Catalog, eligibility, OTT links, Prisma schema/migrations
@@ -90,6 +114,6 @@ responsibility are in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
 - Branch from the accepted v0.7 baseline on `dev`.
 - Push only a feature branch and open a pull request into `dev`.
 - Do not push directly to `dev` or `main` unless you are the repository owner.
-- Keep secrets in `.env.local`; add variable names only to `.env.example`.
+- Keep secrets in `.env.local` (never `.dev.vars*`); add variable names only to `.env.example`.
 - Do not commit generated logs, build output, credentials, tokens, database
   URLs, or personal environment files.

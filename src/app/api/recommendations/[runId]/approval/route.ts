@@ -1,6 +1,10 @@
-import { services } from "@/composition";
-import { type ApprovalDecision } from "@/contracts/recommendation";
-import { RecommendationRunAccessError } from "@/domains/recommendation/orchestrator";
+import { withMvpComposition } from "@/composition";
+import type { MvpApprovalDecision } from "@/contracts/mvp-recommendation";
+import {
+  RecommendationRevisionConflictError,
+  RecommendationRunNotFoundError,
+  RecommendationRunStateError,
+} from "@/domains/recommendation/orchestrator";
 import {
   badRequest,
   enumValue,
@@ -22,34 +26,32 @@ export async function POST(
   try {
     const { runId: rawRunId } = await context.params;
     const runId = rawRunId.trim();
-    if (!runId) {
-      throw badRequest("runId 값이 필요합니다.");
-    }
-    if (!(await services.getRun(runId))) {
-      throw notFound("추천 기록을 찾을 수 없습니다.");
-    }
-
+    if (!runId) throw badRequest("runId 값이 필요합니다.");
     const body = await readJsonObject(request);
-    const decision: ApprovalDecision = enumValue(
+    if (Object.keys(body).some((key) => key !== "decision")) {
+      throw badRequest("승인 요청에는 decision 값만 사용할 수 있습니다.");
+    }
+    const decision: MvpApprovalDecision = enumValue(
       body.decision,
       "decision",
       APPROVAL_DECISIONS,
     );
-    try {
-      return Response.json(await services.decideApproval(runId, decision));
-    } catch (error) {
-      if (error instanceof RecommendationRunAccessError) {
-        throw notFound("추천 기록을 찾을 수 없습니다.");
-      }
-      if (
-        error instanceof Error &&
-        error.message.includes("is not waiting for approval")
-      ) {
-        throw badRequest("이 추천은 현재 승인을 기다리는 상태가 아닙니다.");
-      }
-      throw error;
-    }
+    const response = await withMvpComposition(({ services }) =>
+      services.decideApproval(runId, decision),
+    );
+    return Response.json(response);
   } catch (error) {
+    if (error instanceof RecommendationRunNotFoundError) {
+      return errorResponse(notFound("추천 기록을 찾을 수 없습니다."));
+    }
+    if (
+      error instanceof RecommendationRunStateError ||
+      error instanceof RecommendationRevisionConflictError
+    ) {
+      return errorResponse(
+        badRequest("이 추천은 현재 승인 결정을 받을 수 없습니다."),
+      );
+    }
     return errorResponse(error);
   }
 }
