@@ -611,7 +611,8 @@ test("v0.8 migration adds only anonymous LIVE catalog and vector storage", async
     "content_search_documents",
     "content_embeddings",
   ]);
-  assert.match(migration, /CREATE EXTENSION IF NOT EXISTS "vector"/);
+  assert.match(migration, /CREATE EXTENSION "vector" WITH SCHEMA "extensions"/);
+  assert.match(migration, /ALTER EXTENSION "vector" SET SCHEMA "extensions"/);
   assert.match(migration, /ADD COLUMN "next_trace_sequence" INTEGER NOT NULL/);
   assert.match(migration, /extensions\.vector\(1536\)/);
   assert.match(migration, /USING hnsw \("embedding" extensions\.vector_cosine_ops\)/);

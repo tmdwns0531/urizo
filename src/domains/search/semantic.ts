@@ -224,6 +224,16 @@ function sortStrings(values: readonly string[]): string[] {
   return [...values].sort((left, right) => left.localeCompare(right, "ko"));
 }
 
+const FINGERPRINT_VECTOR_SIGNIFICANT_DIGITS = 12;
+
+function fingerprintVectorValues(values: readonly number[]): string[] {
+  return values.map((value) =>
+    (Object.is(value, -0) ? 0 : value).toPrecision(
+      FINGERPRINT_VECTOR_SIGNIFICANT_DIGITS,
+    ),
+  );
+}
+
 function fingerprintPayload(
   input: SanitizedRecommendationSearchInput,
   queryVector: QueryVectorSnapshot,
@@ -242,7 +252,7 @@ function fingerprintPayload(
     queryVector: {
       algorithm: queryVector.algorithm,
       dimensions: queryVector.dimensions,
-      values: [...queryVector.values],
+      values: fingerprintVectorValues(queryVector.values),
       version: queryVector.version,
     },
   };

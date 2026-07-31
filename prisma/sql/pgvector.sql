@@ -5,7 +5,24 @@
 -- file as a review aid; do not execute it in addition to the migration.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+DO $$
+DECLARE
+  current_vector_schema TEXT;
+BEGIN
+  SELECT namespaces.nspname
+  INTO current_vector_schema
+  FROM pg_extension AS extensions
+  JOIN pg_namespace AS namespaces
+    ON namespaces.oid = extensions.extnamespace
+  WHERE extensions.extname = 'vector';
+
+  IF current_vector_schema IS NULL THEN
+    CREATE EXTENSION vector WITH SCHEMA extensions;
+  ELSIF current_vector_schema <> 'extensions' THEN
+    ALTER EXTENSION vector SET SCHEMA extensions;
+  END IF;
+END
+$$;
 
 -- Enforce one current search document while retaining prior content hashes for
 -- reproducible embedding rebuilds.

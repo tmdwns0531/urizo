@@ -396,17 +396,43 @@ test("injected OpenAI and pgvector adapters validate dimensions and candidate al
   assert.match(queryCall.text, /ANY\(\$2::text\[\]\)/);
   assert.equal(queryCall.text.includes(candidate.id), false);
   assert.deepEqual(queryCall.values[1], [candidate.id]);
+  const persistedContinuation = JSON.parse(
+    JSON.stringify(initial.continuation),
+  );
+  const originalValue = persistedContinuation.queryVector.values[1];
+  persistedContinuation.queryVector.values[1] = Number(
+    originalValue.toPrecision(15),
+  );
+  assert.notEqual(
+    persistedContinuation.queryVector.values[1],
+    originalValue,
+  );
   const continued = await adapter.search(
     {
       kind: "continuation",
       input: resolved.sanitizedInput,
-      continuation: initial.continuation,
+      continuation: persistedContinuation,
     },
     [candidate],
   );
   assert.equal(continued.modelCallCount, 0);
   assert.equal(continued.tokenUsage, 0);
   assert.equal(embeddingCalls, 1);
+
+  const tamperedContinuation = structuredClone(persistedContinuation);
+  tamperedContinuation.queryVector.values[1] += 0.000001;
+  await assert.rejects(
+    () =>
+      adapter.search(
+        {
+          kind: "continuation",
+          input: resolved.sanitizedInput,
+          continuation: tamperedContinuation,
+        },
+        [candidate],
+      ),
+    /continuation does not match/,
+  );
 
   const unsafeAdapter = new pgvectorModule.PgVectorSearchAdapter({
     embeddings: { async embed() { return embedded; } },
