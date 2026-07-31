@@ -2,8 +2,8 @@ import type {
   AgeRating,
   CatalogContent,
   MediaType,
+  OttProvider,
 } from "../../contracts/catalog";
-import type { OttProvider } from "../../contracts/user";
 
 interface FixtureInput {
   id: string;
@@ -45,6 +45,7 @@ const makeContent = (input: FixtureInput): CatalogContent => ({
   providers: input.providers.map((provider) => ({
     provider,
     watchUrl: providerUrl(provider, input.title),
+    linkType: "SEARCH",
   })),
   collectionId: input.collection ?? null,
   voteAverage: input.score,

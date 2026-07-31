@@ -1,10 +1,15 @@
+import type {
+  ErrorResponse,
+  PublicErrorCode,
+} from "@/contracts/mvp-recommendation";
+
 export const ERROR_CODES = {
   badRequest: "BAD_REQUEST",
   notFound: "NOT_FOUND",
   internal: "INTERNAL_ERROR",
 } as const;
 
-type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+type ErrorCode = PublicErrorCode;
 
 export class ApiError extends Error {
   constructor(
@@ -30,7 +35,8 @@ export function jsonError(
   status: 400 | 404 | 500,
   code: ErrorCode,
 ): Response {
-  return Response.json({ error: message, code }, { status });
+  const body = { error: message, code } satisfies ErrorResponse;
+  return Response.json(body, { status });
 }
 
 export function errorResponse(error: unknown): Response {
