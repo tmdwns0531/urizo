@@ -59,6 +59,17 @@ export interface TmdbTvContentRatingsResponse {
   results?: TmdbTvContentRating[];
 }
 
+export interface TmdbKeyword {
+  id: number;
+  name: string;
+}
+
+/** movie 는 keywords.keywords, tv 는 keywords.results 로 키가 다르다. */
+export interface TmdbKeywordsResponse {
+  keywords?: TmdbKeyword[];
+  results?: TmdbKeyword[];
+}
+
 interface TmdbDetailBase {
   id: number;
   overview?: string;
@@ -70,6 +81,7 @@ interface TmdbDetailBase {
   poster_path?: string | null;
   backdrop_path?: string | null;
   "watch/providers"?: TmdbWatchProviderResponse;
+  keywords?: TmdbKeywordsResponse;
 }
 
 export interface TmdbMovieDetail extends TmdbDetailBase {

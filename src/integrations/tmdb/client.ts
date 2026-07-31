@@ -133,10 +133,12 @@ export function createTmdbClient(
     if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
       throw new TmdbClientError("INVALID_CONFIGURATION");
     }
+    // keywords 는 mood·companion 태깅의 유일한 근거다. 별도 호출을 늘리지
+    // 않도록 기존 상세 요청에 함께 실어 받는다.
     const appendToResponse =
       mediaKind === "movie"
-        ? "release_dates,watch/providers"
-        : "content_ratings,watch/providers";
+        ? "release_dates,watch/providers,keywords"
+        : "content_ratings,watch/providers,keywords";
     return request<TmdbDetail>(
       `/${mediaKind}/${tmdbId}`,
       {
