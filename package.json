@@ -14,7 +14,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:validate": "prisma validate"
+    "db:validate": "node scripts/prisma-validate.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.2",

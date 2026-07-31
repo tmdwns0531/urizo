@@ -1,19 +1,16 @@
 import type { CatalogContent } from "./catalog";
+import type {
+  Companion,
+  OriginPreference,
+} from "./mvp-search";
 import type { UserContext } from "./user";
 
-export const COMPANIONS = [
-  "ALONE",
-  "PARTNER",
-  "FRIENDS",
-  "FAMILY",
-  "WITH_CHILDREN",
-  "ANY",
-] as const;
-export type Companion = (typeof COMPANIONS)[number];
+/** @deprecated Import from "./mvp-search" in new anonymous-MVP code. */
+export { COMPANIONS, ORIGIN_PREFERENCES } from "./mvp-search";
+/** @deprecated Import from "./mvp-search" in new anonymous-MVP code. */
+export type { Companion, OriginPreference } from "./mvp-search";
 
-export const ORIGIN_PREFERENCES = ["KR", "NON_KR", "ANY"] as const;
-export type OriginPreference = (typeof ORIGIN_PREFERENCES)[number];
-
+/** @deprecated Use SanitizedRecommendationSearchInput from "./mvp-search". */
 export interface SearchInput {
   user: UserContext;
   companions: Companion[];
@@ -26,6 +23,7 @@ export interface SearchInput {
   explicitlyRequestedGenres: string[];
 }
 
+/** @deprecated Use RecommendationSearchResult from "./mvp-search". */
 export interface SearchResult {
   content: CatalogContent;
   semanticScore: number;

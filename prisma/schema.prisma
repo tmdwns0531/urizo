@@ -8,110 +8,20 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// This schema belongs to the future Prisma Live adapters. The Demo profile must
-// never import a generated Prisma client or require either datasource variable.
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  DELETED
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum ContentKind {
-  MOVIE
-  SERIES
-}
-
-enum CatalogStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum MoodTagSource {
-  CURATED
-  MODEL
-}
-
-enum AvailabilityKind {
-  FLATRATE
-  FREE
-  ADS
-  RENT
-  BUY
-}
-
-enum ProviderLinkType {
-  DIRECT
-  PROVIDER_PAGE
-  SEARCH
-}
+// v0.6/v0.7 persistence baseline. The credential-free Demo continues to use
+// memory repositories and must not initialize Prisma.
 
 enum RecommendationRunStatus {
   RUNNING
   AWAITING_APPROVAL
   COMPLETED
-  PARTIAL
-  FALLBACK
   FAILED
-  CANCELLED
 }
 
 enum RecommendationExecutionMode {
-  PIPELINE
-  AGENT
-}
-
-enum RecommendationItemStatus {
-  ACTIVE
-  REPLACED
-  POLICY_BLOCKED
-}
-
-enum RecommendationItemSource {
-  SELECTOR
+  DETERMINISTIC
+  OPENAI
   FALLBACK
-  REPLACEMENT
-}
-
-enum ApprovalKind {
-  RELAX_RUNTIME
-  REMOVE_ORIGIN_COUNTRY
-  REMOVE_MOOD
-}
-
-enum ApprovalStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  EXPIRED
-}
-
-enum TraceAction {
-  REQUEST_RECEIVED
-  FILTER
-  VECTOR_SEARCH
-  SCORE
-  DIVERSITY
-  SELECT
-  POLICY_BLOCK
-  APPROVAL_REQUEST
-  APPROVAL_DECISION
-  FALLBACK
-  REPLACEMENT
-  COMPLETE
-  ERROR
-}
-
-enum TraceActor {
-  SYSTEM
-  USER
-  EXECUTOR
-  TOOL
 }
 
 enum TraceVisibility {
@@ -119,396 +29,57 @@ enum TraceVisibility {
   PUBLIC
 }
 
-enum EngagementType {
-  BOOKMARK
-  UNBOOKMARK
-  WATCHED
-  NOT_INTERESTED
-  OTT_CLICK
-}
-
-model User {
-  id              String     @id @default(uuid()) @db.Uuid
-  email           String?    @db.VarChar(320)
-  emailNormalized String?    @unique @map("email_normalized") @db.VarChar(320)
-  displayName     String?    @map("display_name") @db.VarChar(100)
-  status          UserStatus @default(ACTIVE)
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(3)
-
-  identities         AuthIdentity[]
-  profile            UserProfile?
-  subscriptions      UserSubscription[]
-  recommendationRuns RecommendationRun[]      @relation("RecommendationRunUser")
-  approvalDecisions  RecommendationApproval[] @relation("ApprovalDecisionUser")
-  engagementEvents   EngagementEvent[]        @relation("EngagementEventUser")
-  contentStates      UserContentState[]
-
-  @@index([status, createdAt], map: "users_status_created_idx")
-  @@map("users")
-}
-
-// Keeps the shared domain independent of the final Auth.js/Better Auth choice.
-// OAuth access/refresh tokens remain owned by the selected authentication
-// adapter; this table stores only stable external identity keys.
-model AuthIdentity {
-  id              String   @id @default(uuid()) @db.Uuid
-  userId          String   @map("user_id") @db.Uuid
-  providerKey     String   @map("provider_key") @db.VarChar(50)
-  providerSubject String   @map("provider_subject") @db.VarChar(255)
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([providerKey, providerSubject], map: "auth_identities_provider_subject_key")
-  @@index([userId], map: "auth_identities_user_idx")
-  @@map("auth_identities")
-}
-
-model UserProfile {
-  userId                           String    @id @map("user_id") @db.Uuid
-  birthDate                        DateTime? @map("birth_date") @db.Date
-  locale                           String    @default("ko-KR") @db.VarChar(20)
-  timeZone                         String    @default("Asia/Seoul") @map("time_zone") @db.VarChar(50)
-  preferredGenres                  String[]  @default([]) @map("preferred_genres")
-  avoidedGenres                    String[]  @default([]) @map("avoided_genres")
-  allowUnsubscribedRecommendations Boolean   @default(false) @map("allow_unsubscribed_recommendations")
-  onboardingCompletedAt            DateTime? @map("onboarding_completed_at") @db.Timestamptz(3)
-  createdAt                        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
-}
-
-model UserSubscription {
-  id         String             @id @default(uuid()) @db.Uuid
-  userId     String             @map("user_id") @db.Uuid
-  providerId String             @map("provider_id") @db.Uuid
-  status     SubscriptionStatus @default(ACTIVE)
-  startedAt  DateTime?          @map("started_at") @db.Date
-  endedAt    DateTime?          @map("ended_at") @db.Date
-  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider OttProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-
-  @@unique([userId, providerId], map: "user_subscriptions_user_provider_key")
-  @@index([userId, status], map: "user_subscriptions_user_status_idx")
-  @@index([providerId, status], map: "user_subscriptions_provider_status_idx")
-  @@map("user_subscriptions")
-}
-
-model Content {
-  id                  String        @id @default(uuid()) @db.Uuid
-  tmdbId              Int           @unique @map("tmdb_id")
-  kind                ContentKind
-  title               String        @db.VarChar(255)
-  originalTitle       String?       @map("original_title") @db.VarChar(255)
-  overview            String?       @db.Text
-  releaseDate         DateTime?     @map("release_date") @db.Date
-  originCountries     String[]      @default([]) @map("origin_countries")
-  productionCountries String[]      @default([]) @map("production_countries")
-  companionTags       String[]      @default([]) @map("companion_tags")
-  originalLanguage    String?       @map("original_language") @db.VarChar(10)
-  runtimeMinutes      Int?          @map("runtime_minutes")
-  ratingRegion        String        @default("KR") @map("rating_region") @db.VarChar(10)
-  ratingCode          String?       @map("rating_code") @db.VarChar(30)
-  minimumAge          Int?          @map("minimum_age")
-  isAdult             Boolean       @default(false) @map("is_adult")
-  popularity          Float         @default(0)
-  voteAverage         Float         @default(0) @map("vote_average")
-  voteCount           Int           @default(0) @map("vote_count")
-  qualityScore        Float         @default(0) @map("quality_score")
-  tmdbCollectionId    Int?          @map("tmdb_collection_id")
-  posterPath          String?       @map("poster_path") @db.VarChar(500)
-  backdropPath        String?       @map("backdrop_path") @db.VarChar(500)
-  backdropColor       String        @default("#172554") @map("backdrop_color") @db.VarChar(20)
-  status              CatalogStatus @default(ACTIVE)
-  sourceUpdatedAt     DateTime?     @map("source_updated_at") @db.Timestamptz(3)
-  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  genres              ContentGenre[]
-  moodTags            ContentMoodTag[]
-  availability        ContentAvailability[]
-  providerLinks       ProviderLink[]
-  searchDocuments     ContentSearchDocument[]
-  recommendationItems RecommendationItem[]
-  engagementEvents    EngagementEvent[]
-  userStates          UserContentState[]
-
-  @@index([status, kind, releaseDate], map: "contents_status_kind_release_idx")
-  @@index([status, minimumAge], map: "contents_status_minimum_age_idx")
-  @@index([status, qualityScore], map: "contents_status_quality_idx")
-  @@index([tmdbCollectionId], map: "contents_collection_idx")
-  @@map("contents")
-}
-
-model Genre {
-  id        String   @id @default(uuid()) @db.Uuid
-  tmdbId    Int?     @unique @map("tmdb_id")
-  slug      String   @unique @db.VarChar(80)
-  nameKo    String   @map("name_ko") @db.VarChar(100)
-  nameEn    String?  @map("name_en") @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  contents ContentGenre[]
-
-  @@map("genres")
-}
-
-model ContentGenre {
-  contentId String @map("content_id") @db.Uuid
-  genreId   String @map("genre_id") @db.Uuid
-
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  genre   Genre   @relation(fields: [genreId], references: [id], onDelete: Restrict)
-
-  @@id([contentId, genreId])
-  @@index([genreId, contentId], map: "content_genres_genre_content_idx")
-  @@map("content_genres")
-}
-
-model MoodTag {
-  id          String   @id @default(uuid()) @db.Uuid
-  slug        String   @unique @db.VarChar(80)
-  labelKo     String   @map("label_ko") @db.VarChar(100)
-  description String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  contents ContentMoodTag[]
-
-  @@map("mood_tags")
-}
-
-model ContentMoodTag {
-  contentId  String        @map("content_id") @db.Uuid
-  moodTagId  String        @map("mood_tag_id") @db.Uuid
-  confidence Float         @default(1)
-  source     MoodTagSource
-  model      String?       @db.VarChar(100)
-  taggedAt   DateTime      @default(now()) @map("tagged_at") @db.Timestamptz(3)
-
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  moodTag MoodTag @relation(fields: [moodTagId], references: [id], onDelete: Restrict)
-
-  @@id([contentId, moodTagId])
-  @@index([moodTagId, confidence], map: "content_mood_tags_tag_confidence_idx")
-  @@map("content_mood_tags")
-}
-
-model OttProvider {
-  id                  String   @id @default(uuid()) @db.Uuid
-  slug                String   @unique @db.VarChar(80)
-  name                String   @db.VarChar(100)
-  tmdbWatchProviderId Int?     @unique @map("tmdb_watch_provider_id")
-  homepageUrl         String?  @map("homepage_url") @db.Text
-  searchUrlTemplate   String?  @map("search_url_template") @db.Text
-  logoPath            String?  @map("logo_path") @db.VarChar(500)
-  displayPriority     Int      @default(0) @map("display_priority")
-  isActive            Boolean  @default(true) @map("is_active")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  subscriptions UserSubscription[]
-  availability  ContentAvailability[]
-  links         ProviderLink[]
-
-  @@index([isActive, displayPriority], map: "ott_providers_active_priority_idx")
-  @@map("ott_providers")
-}
-
-model ContentAvailability {
-  id              String           @id @default(uuid()) @db.Uuid
-  contentId       String           @map("content_id") @db.Uuid
-  providerId      String           @map("provider_id") @db.Uuid
-  region          String           @default("KR") @db.VarChar(10)
-  kind            AvailabilityKind
-  displayPriority Int              @default(0) @map("display_priority")
-  availableFrom   DateTime?        @map("available_from") @db.Date
-  availableUntil  DateTime?        @map("available_until") @db.Date
-  lastVerifiedAt  DateTime         @map("last_verified_at") @db.Timestamptz(3)
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  content  Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  provider OttProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@unique([contentId, providerId, region, kind], map: "content_availability_identity_key")
-  @@index([providerId, region, kind, contentId], map: "content_availability_provider_region_idx")
-  @@index([contentId, region], map: "content_availability_content_region_idx")
-  @@map("content_availability")
-}
-
-model ProviderLink {
-  id             String           @id @default(uuid()) @db.Uuid
-  contentId      String           @map("content_id") @db.Uuid
-  providerId     String           @map("provider_id") @db.Uuid
-  region         String           @default("KR") @db.VarChar(10)
-  type           ProviderLinkType
-  url            String           @db.Text
-  priority       Int              @default(0)
-  isVerified     Boolean          @default(false) @map("is_verified")
-  lastVerifiedAt DateTime?        @map("last_verified_at") @db.Timestamptz(3)
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  content  Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  provider OttProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@unique([contentId, providerId, region, type], map: "provider_links_content_provider_region_type_key")
-  @@index([providerId, region, type], map: "provider_links_provider_region_type_idx")
-  @@map("provider_links")
-}
-
-model ContentSearchDocument {
-  id        String   @id @default(uuid()) @db.Uuid
-  contentId String   @map("content_id") @db.Uuid
-  version   Int      @default(1)
-  document  String   @db.Text
-  keywords  String[] @default([])
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  content    Content            @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  embeddings ContentEmbedding[]
-
-  @@unique([contentId, version], map: "content_search_documents_content_version_key")
-  @@index([contentId, isActive], map: "content_search_documents_content_active_idx")
-  @@map("content_search_documents")
-}
-
-model ContentEmbedding {
-  id         String                       @id @default(uuid()) @db.Uuid
-  documentId String                       @map("document_id") @db.Uuid
-  provider   String                       @default("openai") @db.VarChar(50)
-  model      String                       @db.VarChar(100)
-  dimensions Int                          @default(1536)
-  embedding  Unsupported("vector(1536)")?
-  createdAt  DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  document ContentSearchDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, provider, model, dimensions], map: "content_embeddings_document_model_key")
-  @@index([documentId], map: "content_embeddings_document_idx")
-  @@map("content_embeddings")
+enum TraceAction {
+  filter
+  vector_search
+  score
+  select
+  policy_block
+  approval_request
+  approval_decision
+  fallback
+  replacement
+  complete
 }
 
 model RecommendationRun {
-  id                         String                      @id @default(uuid()) @db.Uuid
-  userId                     String?                     @map("user_id") @db.Uuid
-  policySubjectUserId        String?                     @map("policy_subject_user_id") @db.Uuid
-  status                     RecommendationRunStatus     @default(RUNNING)
-  executionMode              RecommendationExecutionMode @default(PIPELINE) @map("execution_mode")
-  searchAdapter              String                      @map("search_adapter") @db.VarChar(50)
-  selectorAdapter            String                      @map("selector_adapter") @db.VarChar(50)
-  inputFingerprint           String                      @map("input_fingerprint") @db.VarChar(128)
-  companion                  String?                     @db.VarChar(50)
-  requestedMaxRuntimeMinutes Int?                        @map("requested_max_runtime_minutes")
-  effectiveMaxRuntimeMinutes Int?                        @map("effective_max_runtime_minutes")
-  requestedMoods             String[]                    @default([]) @map("requested_moods")
-  requestedOriginCountries   String[]                    @default([]) @map("requested_origin_countries")
-  naturalLanguageQuery       String?                     @map("natural_language_query") @db.Text
-  requestSnapshot            Json                        @map("request_snapshot")
-  userSnapshot               Json                        @map("user_snapshot")
-  candidateCount             Int                         @default(0) @map("candidate_count")
-  resultCount                Int                         @default(0) @map("result_count")
-  llmCallCount               Int                         @default(0) @map("llm_call_count")
-  embeddingCallCount         Int                         @default(0) @map("embedding_call_count")
-  totalTokens                Int                         @default(0) @map("total_tokens")
-  durationMs                 Int?                        @map("duration_ms")
-  policyBlockCount           Int                         @default(0) @map("policy_block_count")
-  fallbackReason             String?                     @map("fallback_reason") @db.VarChar(100)
-  errorCode                  String?                     @map("error_code") @db.VarChar(100)
-  excludedContentIds         String[]                    @default([]) @map("excluded_content_ids")
-  replacedContentIds         String[]                    @default([]) @map("replaced_content_ids")
-  startedAt                  DateTime                    @default(now()) @map("started_at") @db.Timestamptz(3)
-  completedAt                DateTime?                   @map("completed_at") @db.Timestamptz(3)
-  createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                  DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                 String                      @id @db.VarChar(64)
+  status             RecommendationRunStatus     @default(RUNNING)
+  revision           Int                         @default(0)
+  executionMode      RecommendationExecutionMode @default(DETERMINISTIC) @map("execution_mode")
+  inputFingerprint   String                      @map("input_fingerprint") @db.VarChar(71)
+  requestSnapshot    Json                        @map("request_snapshot")
+  queryVector        Json                        @map("query_vector")
+  responseSnapshot   Json?                       @map("response_snapshot")
+  excludedContentIds String[]                    @default([]) @map("excluded_content_ids")
+  replacedContentIds String[]                    @default([]) @map("replaced_content_ids")
+  candidateCount     Int                         @default(0) @map("candidate_count")
+  resultCount        Int                         @default(0) @map("result_count")
+  modelCallCount     Int                         @default(0) @map("model_call_count")
+  toolCallCount      Int                         @default(0) @map("tool_call_count")
+  totalTokens        Int                         @default(0) @map("total_tokens")
+  durationMs         Int                         @default(0) @map("duration_ms")
+  policyBlockCount   Int                         @default(0) @map("policy_block_count")
+  fallbackReason     String?                     @map("fallback_reason") @db.VarChar(32)
+  errorCode          String?                     @map("error_code") @db.VarChar(32)
+  startedAt          DateTime                    @default(now()) @map("started_at") @db.Timestamptz(3)
+  completedAt        DateTime?                   @map("completed_at") @db.Timestamptz(3)
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user             User?                    @relation("RecommendationRunUser", fields: [userId], references: [id], onDelete: SetNull)
-  items            RecommendationItem[]
-  approvals        RecommendationApproval[]
-  traces           AgentTrace[]
-  engagementEvents EngagementEvent[]
+  traces AgentTrace[]
 
-  @@index([userId, createdAt], map: "recommendation_runs_user_created_idx")
   @@index([status, createdAt], map: "recommendation_runs_status_created_idx")
   @@index([inputFingerprint], map: "recommendation_runs_fingerprint_idx")
   @@map("recommendation_runs")
 }
 
-model RecommendationItem {
-  id                  String                   @id @default(uuid()) @db.Uuid
-  runId               String                   @map("run_id") @db.Uuid
-  contentId           String?                  @map("content_id") @db.Uuid
-  position            Int
-  revision            Int                      @default(0)
-  status              RecommendationItemStatus @default(ACTIVE)
-  source              RecommendationItemSource
-  hybridScore         Float?                   @map("hybrid_score")
-  scoreBreakdown      Json?                    @map("score_breakdown")
-  reasons             String[]                 @default([])
-  contentSnapshot     Json                     @map("content_snapshot")
-  replacesItemId      String?                  @map("replaces_item_id") @db.Uuid
-  policyRemovalReason String?                  @map("policy_removal_reason") @db.VarChar(100)
-  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  run              RecommendationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
-  content          Content?             @relation(fields: [contentId], references: [id], onDelete: SetNull)
-  replaces         RecommendationItem?  @relation("RecommendationItemReplacement", fields: [replacesItemId], references: [id], onDelete: SetNull)
-  replacementItems RecommendationItem[] @relation("RecommendationItemReplacement")
-  engagementEvents EngagementEvent[]
-
-  @@unique([runId, position, revision], map: "recommendation_items_run_position_revision_key")
-  @@index([runId, status, position], map: "recommendation_items_run_status_position_idx")
-  @@index([contentId], map: "recommendation_items_content_idx")
-  @@index([replacesItemId], map: "recommendation_items_replaces_idx")
-  @@map("recommendation_items")
-}
-
-model RecommendationApproval {
-  id              String         @id @default(uuid()) @db.Uuid
-  runId           String         @map("run_id") @db.Uuid
-  sequence        Int            @default(1)
-  kind            ApprovalKind
-  status          ApprovalStatus @default(PENDING)
-  candidateCount  Int            @map("candidate_count")
-  proposedChanges Json           @map("proposed_changes")
-  publicMessage   String         @map("public_message") @db.Text
-  decidedByUserId String?        @map("decided_by_user_id") @db.Uuid
-  requestedAt     DateTime       @default(now()) @map("requested_at") @db.Timestamptz(3)
-  decidedAt       DateTime?      @map("decided_at") @db.Timestamptz(3)
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  run       RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  decidedBy User?             @relation("ApprovalDecisionUser", fields: [decidedByUserId], references: [id], onDelete: SetNull)
-
-  @@unique([runId, sequence], map: "recommendation_approvals_run_sequence_key")
-  @@index([status, requestedAt], map: "recommendation_approvals_status_requested_idx")
-  @@map("recommendation_approvals")
-}
-
 model AgentTrace {
-  id            String          @id @default(uuid()) @db.Uuid
-  runId         String          @map("run_id") @db.Uuid
+  id            String          @id @db.VarChar(64)
+  runId         String          @map("run_id") @db.VarChar(64)
   sequence      Int
   action        TraceAction
-  actor         TraceActor      @default(SYSTEM)
-  visibility    TraceVisibility @default(INTERNAL)
-  toolName      String?         @map("tool_name") @db.VarChar(100)
+  visibility    TraceVisibility
   detail        Json
   publicMessage String?         @map("public_message") @db.Text
   durationMs    Int?            @map("duration_ms")
@@ -517,55 +88,6 @@ model AgentTrace {
   run RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@unique([runId, sequence], map: "agent_traces_run_sequence_key")
-  @@index([action, createdAt], map: "agent_traces_action_created_idx")
   @@index([runId, visibility, sequence], map: "agent_traces_run_visibility_idx")
   @@map("agent_traces")
-}
-
-// Append-only analytics/audit events. The nullable user/content relations allow
-// later privacy anonymization or catalog retirement while snapshots remain useful.
-model EngagementEvent {
-  id                   String         @id @default(uuid()) @db.Uuid
-  userId               String?        @map("user_id") @db.Uuid
-  contentId            String?        @map("content_id") @db.Uuid
-  recommendationRunId  String?        @map("recommendation_run_id") @db.Uuid
-  recommendationItemId String?        @map("recommendation_item_id") @db.Uuid
-  type                 EngagementType
-  idempotencyKey       String?        @unique @map("idempotency_key") @db.VarChar(128)
-  contentSnapshot      Json?          @map("content_snapshot")
-  metadata             Json?
-  occurredAt           DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  user               User?               @relation("EngagementEventUser", fields: [userId], references: [id], onDelete: SetNull)
-  content            Content?            @relation(fields: [contentId], references: [id], onDelete: SetNull)
-  recommendationRun  RecommendationRun?  @relation(fields: [recommendationRunId], references: [id], onDelete: SetNull)
-  recommendationItem RecommendationItem? @relation(fields: [recommendationItemId], references: [id], onDelete: SetNull)
-
-  @@index([userId, type, occurredAt], map: "engagement_events_user_type_occurred_idx")
-  @@index([contentId, type, occurredAt], map: "engagement_events_content_type_occurred_idx")
-  @@index([recommendationRunId, occurredAt], map: "engagement_events_run_occurred_idx")
-  @@map("engagement_events")
-}
-
-// Transactionally maintained projection for exclusion filters and the MY tabs.
-// EngagementEvent remains the append-only source for analytics.
-model UserContentState {
-  userId          String    @map("user_id") @db.Uuid
-  contentId       String    @map("content_id") @db.Uuid
-  savedAt         DateTime? @map("saved_at") @db.Timestamptz(3)
-  watchedAt       DateTime? @map("watched_at") @db.Timestamptz(3)
-  notInterestedAt DateTime? @map("not_interested_at") @db.Timestamptz(3)
-  latestEventAt   DateTime  @default(now()) @map("latest_event_at") @db.Timestamptz(3)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@id([userId, contentId])
-  @@index([userId, savedAt], map: "user_content_states_user_saved_idx")
-  @@index([userId, watchedAt], map: "user_content_states_user_watched_idx")
-  @@index([userId, notInterestedAt], map: "user_content_states_user_not_interested_idx")
-  @@map("user_content_states")
 }

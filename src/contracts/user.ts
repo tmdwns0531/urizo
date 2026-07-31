@@ -1,14 +1,13 @@
-export const OTT_PROVIDERS = [
-  "NETFLIX",
-  "TVING",
-  "DISNEY_PLUS",
-  "WAVVE",
-  "WATCHA",
-  "COUPANG_PLAY",
-] as const;
+import type { OttProvider } from "./catalog";
 
-export type OttProvider = (typeof OTT_PROVIDERS)[number];
+/**
+ * @deprecated Import OTT_PROVIDERS and OttProvider from "./catalog".
+ */
+export { OTT_PROVIDERS } from "./catalog";
+/** @deprecated Import OttProvider from "./catalog". */
+export type { OttProvider } from "./catalog";
 
+/** @deprecated Removed from the v0.6 anonymous MVP active contract. */
 export interface UserContext {
   id: string;
   displayName: string;
@@ -24,6 +23,7 @@ export interface UserContext {
   bookmarkedContentIds: string[];
 }
 
+/** @deprecated Removed from the v0.6 anonymous MVP active contract. */
 export type UserProfilePatch = Partial<
   Pick<
     UserContext,
