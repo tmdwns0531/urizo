@@ -111,9 +111,22 @@ responsibility are in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
 - If Git metadata is absent, report the repository as not team-development
   ready; do not initialize a repository or invent a remote without owner
   direction.
-- Branch from the accepted v0.7 baseline on `dev`.
-- Push only a feature branch and open a pull request into `dev`.
-- Do not push directly to `dev` or `main` unless you are the repository owner.
+- Every contributor, including the repository owner, branches from the latest
+  accepted `dev`; personal work never starts directly on `dev` or `main`.
+- Feature branch names must use
+  `feature/<github-id>_<work-slug>_<version>`.
+- `<github-id>` is the contributor's exact GitHub login. `<work-slug>` uses
+  lowercase ASCII letters, digits, and hyphens. `<version>` uses the agreed
+  product version such as `v0.8` or `v0.8.1`.
+- Example: `feature/tmdwns0531_live-runtime_v0.8`.
+- Push only the feature branch and open a pull request into `dev`.
+- Do not push commits directly to `dev` or `main`, including owner work.
+- Merge reviewed feature pull requests into `dev`; promote `dev` to `main`
+  only through the repository owner's release process.
+- Keep one reviewable work item on one feature branch. A later team allocation
+  document may assign work slugs, but it must keep this naming contract.
 - Keep secrets in `.env.local` (never `.dev.vars*`); add variable names only to `.env.example`.
 - Do not commit generated logs, build output, credentials, tokens, database
   URLs, or personal environment files.
+- The detailed command sequence and examples are in
+  `docs/GIT-WORKFLOW.md`.
