@@ -3,16 +3,96 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  ApprovalDecision,
-  AwaitingApprovalRecommendationResponse,
-  CompletedRecommendationResponse,
-  RecommendationResponse,
-} from "@/contracts/recommendation";
+  MvpApprovalDecision as ApprovalDecision,
+  MvpAwaitingApprovalRecommendationResponse as AwaitingApprovalRecommendationResponse,
+  MvpCompletedRecommendationResponse as CompletedRecommendationResponse,
+  MvpRecommendationResponse as RecommendationResponse,
+} from "@/contracts/mvp-recommendation";
 import { ContentCard } from "./content-card";
 
 type RecommendationViewProps = {
   runId: string;
 };
+
+export type ReplacementFeedbackStatus =
+  | "pending"
+  | "success"
+  | "exhausted"
+  | "error";
+
+export type ReplacementFeedback = {
+  status: ReplacementFeedbackStatus;
+  title: string;
+  description: string;
+};
+
+export const REPLACEMENT_FEEDBACK = {
+  pending: {
+    status: "pending",
+    title: "새 교체 후보를 찾고 있어요.",
+    description:
+      "현재 카드와 이전에 본 작품을 제외하고 안전 기준을 확인 중이에요.",
+  },
+  success: {
+    status: "success",
+    title: "작품을 교체했어요.",
+    description: "카드 한 자리만 새 후보로 바꾸고 나머지 결과는 유지했어요.",
+  },
+  exhausted: {
+    status: "exhausted",
+    title: "같은 조건의 다른 후보가 없어요.",
+    description: "기존 결과는 그대로 유지했어요.",
+  },
+  error: {
+    status: "error",
+    title: "교체 요청을 완료하지 못했어요.",
+    description:
+      "네트워크 연결을 확인한 뒤 다시 시도해 주세요. 기존 결과는 그대로 유지했어요.",
+  },
+} as const satisfies Record<ReplacementFeedbackStatus, ReplacementFeedback>;
+
+class ReplacementRequestError extends Error {
+  constructor(
+    readonly feedbackStatus: Extract<
+      ReplacementFeedbackStatus,
+      "exhausted" | "error"
+    >,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ReplacementRequestError";
+  }
+}
+
+export function ReplacementFeedbackNotice({
+  feedback,
+}: {
+  feedback: ReplacementFeedback | null;
+}) {
+  if (!feedback) return null;
+
+  const icon =
+    feedback.status === "pending"
+      ? "↻"
+      : feedback.status === "success"
+        ? "✓"
+        : feedback.status === "exhausted"
+          ? "i"
+          : "!";
+
+  return (
+    <aside
+      className="result-notice result-notice--neutral"
+      data-replacement-state={feedback.status}
+    >
+      <span aria-hidden="true">{icon}</span>
+      <div>
+        <strong>{feedback.title}</strong>
+        <p>{feedback.description}</p>
+      </div>
+    </aside>
+  );
+}
 
 function Timeline({ response }: { response: RecommendationResponse }) {
   return (
@@ -54,8 +134,8 @@ function Timeline({ response }: { response: RecommendationResponse }) {
         ))}
       </ol>
       <div className="trace-panel__foot">
-        <span>Demo 실행 상세</span>
-        <code>fixture · local · deterministic · memory</code>
+        <span>추천 실행 상세</span>
+        <code>필터 · 검색 · 선택 · 정책 · Trace</code>
       </div>
     </details>
   );
@@ -136,7 +216,6 @@ function ApprovalView({
             <ContentCard
               item={item}
               rank={index + 1}
-              runId={response.runId}
               key={item.content.id}
             />
           ))}
@@ -147,14 +226,16 @@ function ApprovalView({
   );
 }
 
-function CompletedView({
+export function CompletedView({
   response,
   onReplace,
   replacingId,
+  replacementFeedback,
 }: {
   response: CompletedRecommendationResponse;
   onReplace: (contentId: string) => void;
   replacingId: string | null;
+  replacementFeedback: ReplacementFeedback | null;
 }) {
   const alternatives = response.recommendations.filter(
     (item) => item.content.id !== response.topPick?.content.id,
@@ -180,6 +261,8 @@ function CompletedView({
           </Link>
         </div>
       </header>
+
+      <ReplacementFeedbackNotice feedback={replacementFeedback} />
 
       {response.fallbackUsed ? (
         <aside className="result-notice result-notice--fallback">
@@ -221,7 +304,6 @@ function CompletedView({
           <ContentCard
             item={response.topPick}
             rank={1}
-            runId={response.runId}
             hero
             onReplace={onReplace}
             replacing={replacingId === response.topPick.content.id}
@@ -254,8 +336,7 @@ function CompletedView({
               <ContentCard
                 item={item}
                 rank={index + 2}
-                runId={response.runId}
-                key={item.content.id}
+                  key={item.content.id}
                 onReplace={onReplace}
                 replacing={replacingId === item.content.id}
                 replacementPending={replacingId !== null}
@@ -275,6 +356,8 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
   const [actionError, setActionError] = useState("");
   const [deciding, setDeciding] = useState<ApprovalDecision | null>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [replacementFeedback, setReplacementFeedback] =
+    useState<ReplacementFeedback | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const replacementLock = useRef(false);
 
@@ -390,7 +473,25 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
     if (replacementLock.current) return;
     replacementLock.current = true;
     setReplacingId(contentId);
-    setAnnouncement("같은 조건의 안전한 교체 후보를 찾고 있어요.");
+    setReplacementFeedback(REPLACEMENT_FEEDBACK.pending);
+    setAnnouncement(
+      `${REPLACEMENT_FEEDBACK.pending.title} ${REPLACEMENT_FEEDBACK.pending.description}`,
+    );
+    try {
+      const storageKey = "ott-damoa:not-interested";
+      const current = JSON.parse(
+        sessionStorage.getItem(storageKey) ?? "[]",
+      ) as unknown;
+      const values = Array.isArray(current)
+        ? current.filter((value): value is string => typeof value === "string")
+        : [];
+      sessionStorage.setItem(
+        storageKey,
+        JSON.stringify([...new Set([...values, contentId])]),
+      );
+    } catch {
+      // Replacement remains available when browser storage is unavailable.
+    }
     try {
       const request = await fetch(
         `/api/recommendations/${encodeURIComponent(runId)}/replacement`,
@@ -405,19 +506,33 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
         | { error?: string }
         | null;
       if (!request.ok || !result || !("status" in result)) {
-        throw new Error(
+        throw new ReplacementRequestError(
+          request.status === 400 ? "exhausted" : "error",
           (result && "error" in result && result.error) ||
             "다른 후보가 없어요.",
         );
       }
+      if (result.status !== "completed") {
+        throw new ReplacementRequestError(
+          "error",
+          "교체 결과를 확인하지 못했어요.",
+        );
+      }
       setResponse(result);
-      setAnnouncement("시간·구독 OTT·연령 기준을 지킨 새 후보로 바꿨어요.");
-    } catch (replaceError) {
+      setReplacementFeedback(REPLACEMENT_FEEDBACK.success);
       setAnnouncement(
-        replaceError instanceof Error
-          ? replaceError.message
-          : "같은 조건의 다른 후보가 없어요.",
+        `${REPLACEMENT_FEEDBACK.success.title} ${REPLACEMENT_FEEDBACK.success.description}`,
       );
+    } catch (replaceError) {
+      const feedback =
+        replaceError instanceof ReplacementRequestError
+          ? {
+              ...REPLACEMENT_FEEDBACK[replaceError.feedbackStatus],
+              description: `${replaceError.message} 기존 결과는 그대로 유지했어요.`,
+            }
+          : REPLACEMENT_FEEDBACK.error;
+      setReplacementFeedback(feedback);
+      setAnnouncement(`${feedback.title} ${feedback.description}`);
     } finally {
       replacementLock.current = false;
       setReplacingId(null);
@@ -446,7 +561,7 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
       <div className="empty-state empty-state--error">
         <span aria-hidden="true">!</span>
         <h1>추천 기록을 불러오지 못했어요.</h1>
-        <p>{error || "Demo 세션이 초기화되었을 수 있어요."}</p>
+        <p>{error || "추천 기록이 만료되었거나 저장소에 없을 수 있어요."}</p>
         <div>
           <button
             className="button button--ghost"
@@ -483,6 +598,7 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
           response={response}
           onReplace={replace}
           replacingId={replacingId}
+          replacementFeedback={replacementFeedback}
         />
       )}
     </div>

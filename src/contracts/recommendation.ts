@@ -1,5 +1,5 @@
 import type { CatalogContent } from "./catalog";
-import type { Companion, OriginPreference } from "./search";
+import type { Companion, OriginPreference } from "./mvp-search";
 
 export const DEMO_SCENARIOS = [
   "normal",
@@ -7,8 +7,10 @@ export const DEMO_SCENARIOS = [
   "policy_block",
   "budget_fallback",
 ] as const;
+/** @deprecated Use MvpDemoScenario from "./mvp-search". */
 export type DemoScenario = (typeof DEMO_SCENARIOS)[number];
 
+/** @deprecated Use MvpRecommendationChoice from "./mvp-search". */
 export interface RecommendationChoice {
   companions?: Companion[];
   moods?: string[];
@@ -20,6 +22,7 @@ export interface RecommendationChoice {
   explicitlyRequestedGenres?: string[];
 }
 
+/** @deprecated Use MvpRecommendationRequest from "./mvp-search". */
 export interface RecommendationRequest {
   /**
    * @deprecated Authentication identity is resolved server-side. This field is
@@ -50,6 +53,7 @@ export interface RecommendationItem {
   replacementOf?: string;
 }
 
+/** @deprecated Use MvpApprovalProposal from "./mvp-recommendation". */
 export interface ApprovalProposal {
   kind: "RUNTIME_RELAXATION";
   currentMaxMinutes: 30;
@@ -60,6 +64,7 @@ export interface ApprovalProposal {
   rejectLabel: string;
 }
 
+/** @deprecated Use MvpApprovalDecision from "./mvp-recommendation". */
 export type ApprovalDecision = "approve" | "reject";
 
 export const TRACE_ACTIONS = [
@@ -74,8 +79,10 @@ export const TRACE_ACTIONS = [
   "replacement",
   "complete",
 ] as const;
+/** @deprecated Use MvpTraceAction from "./mvp-recommendation". */
 export type TraceAction = (typeof TRACE_ACTIONS)[number];
 
+/** @deprecated Use MvpPublicTraceEvent from "./mvp-recommendation". */
 export interface PublicTraceEvent {
   id: string;
   runId: string;
@@ -94,6 +101,7 @@ interface ResponseBase {
   trace: PublicTraceEvent[];
 }
 
+/** @deprecated Use MvpCompletedRecommendationResponse from "./mvp-recommendation". */
 export interface CompletedRecommendationResponse extends ResponseBase {
   status: "completed";
   recommendations: RecommendationItem[];
@@ -103,6 +111,7 @@ export interface CompletedRecommendationResponse extends ResponseBase {
   notice?: string;
 }
 
+/** @deprecated Use MvpAwaitingApprovalRecommendationResponse from "./mvp-recommendation". */
 export interface AwaitingApprovalRecommendationResponse extends ResponseBase {
   status: "awaiting_approval";
   proposal: ApprovalProposal;
@@ -111,10 +120,12 @@ export interface AwaitingApprovalRecommendationResponse extends ResponseBase {
   policyBlockedCount: number;
 }
 
+/** @deprecated Use MvpRecommendationResponse from "./mvp-recommendation". */
 export type RecommendationResponse =
   | CompletedRecommendationResponse
   | AwaitingApprovalRecommendationResponse;
 
+/** @deprecated Use StoredRecommendationRun from "./mvp-recommendation". */
 export interface RecommendationRun {
   id: string;
   /** Authenticated owner of the run and all related engagement. */

@@ -1,29 +1,27 @@
 import type {
-  AuthAdapter,
-  CatalogRepository,
-  EngagementRepository,
-  ProfileRepository,
-  RunRepository,
-  SearchAdapter,
-  SelectorAdapter,
-  TraceRepository,
-} from "../contracts/ports";
-import type { RecommendationServices } from "../domains/recommendation/orchestrator";
+  AgentTraceRepository,
+  RecommendationPersistenceUnitOfWork,
+  RecommendationRunRepository,
+  RecommendationSearchAdapter,
+  RecommendationSelectorAdapter,
+} from "../contracts/mvp-ports";
+import type { AnonymousRecommendationServices } from "../contracts/mvp-recommendation";
+import type { CatalogRepository } from "../contracts/ports";
 
-export interface AdapterSet {
-  auth: AuthAdapter;
+export interface MvpAdapterSet {
   catalog: CatalogRepository;
-  search: SearchAdapter;
-  selector: SelectorAdapter;
-  runs: RunRepository;
-  traces: TraceRepository;
-  engagements: EngagementRepository;
-  profiles: ProfileRepository;
+  search: RecommendationSearchAdapter;
+  selector: RecommendationSelectorAdapter;
+  runs: RecommendationRunRepository;
+  traces: AgentTraceRepository;
 }
 
-export type AdapterOverrides = Partial<AdapterSet>;
+export type MvpAdapterOverrides = Partial<MvpAdapterSet> & {
+  persistence?: RecommendationPersistenceUnitOfWork;
+};
 
-export interface Composition {
-  adapters: AdapterSet;
-  services: RecommendationServices;
+export interface MvpComposition {
+  adapters: MvpAdapterSet;
+  services: AnonymousRecommendationServices;
+  dispose(): Promise<void>;
 }

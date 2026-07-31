@@ -1,3 +1,5 @@
+import { MVP_BUDGET_LIMITS } from "../contracts/mvp-recommendation";
+
 export interface RecommendationWeights {
   semantic: number;
   mood: number;
@@ -32,12 +34,7 @@ export const RECOMMENDATION_WEIGHTS = {
 
 export const DIVERSITY_PENALTY_PER_REPEAT = 0.12;
 
-export const BUDGET_LIMITS = {
-  modelCalls: 3,
-  toolCalls: 2,
-  tokens: 8_000,
-  elapsedMs: 25_000,
-} as const;
+export const BUDGET_LIMITS = MVP_BUDGET_LIMITS;
 
 export const RESULT_LIMIT = 5;
 export const SEARCH_LIMIT = 30;

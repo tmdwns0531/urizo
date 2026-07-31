@@ -1,15 +1,31 @@
--- Migration fragment for the Prisma Live database only.
+-- Reference fragment for the Prisma LIVE database only.
 --
--- Do not run this file from the Demo profile. When the first Prisma migration
--- is created, place the extension statement before the generated table DDL and
--- the indexes after the generated content_search_documents/content_embeddings
--- table DDL. Keep this SQL under migration review by the catalog/DB owner.
+-- The executable form now lives in
+-- migrations/20260731160000_v08_live_catalog_vector/migration.sql. Keep this
+-- file as a review aid; do not execute it in addition to the migration.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+DO $$
+DECLARE
+  current_vector_schema TEXT;
+BEGIN
+  SELECT namespaces.nspname
+  INTO current_vector_schema
+  FROM pg_extension AS extensions
+  JOIN pg_namespace AS namespaces
+    ON namespaces.oid = extensions.extnamespace
+  WHERE extensions.extname = 'vector';
 
--- Enforce one current search document while retaining prior versions for audit
--- and reproducible embedding rebuilds.
+  IF current_vector_schema IS NULL THEN
+    CREATE EXTENSION vector WITH SCHEMA extensions;
+  ELSIF current_vector_schema <> 'extensions' THEN
+    ALTER EXTENSION vector SET SCHEMA extensions;
+  END IF;
+END
+$$;
+
+-- Enforce one current search document while retaining prior content hashes for
+-- reproducible embedding rebuilds.
 CREATE UNIQUE INDEX IF NOT EXISTS content_search_documents_one_active_idx
   ON content_search_documents (content_id)
   WHERE is_active = TRUE;
@@ -18,7 +34,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS content_search_documents_one_active_idx
 -- class index intentionally lives in SQL rather than schema.prisma.
 CREATE INDEX IF NOT EXISTS content_embeddings_embedding_hnsw_cosine_idx
   ON content_embeddings
-  USING hnsw (embedding extensions.vector_cosine_ops)
-  WHERE embedding IS NOT NULL;
+  USING hnsw (embedding extensions.vector_cosine_ops);
 
 ANALYZE content_embeddings;

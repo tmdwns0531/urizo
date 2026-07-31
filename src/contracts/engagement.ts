@@ -8,6 +8,7 @@ export const ENGAGEMENT_TYPES = [
 
 export type EngagementType = (typeof ENGAGEMENT_TYPES)[number];
 
+/** @deprecated Engagement is outside the v0.6 anonymous MVP. */
 export interface EngagementEvent {
   id: string;
   userId: string;
@@ -18,6 +19,7 @@ export interface EngagementEvent {
   provider?: string;
 }
 
+/** @deprecated Engagement is outside the v0.6 anonymous MVP. */
 export type EngagementEventInput = Omit<EngagementEvent, "id" | "createdAt">;
 
 /**

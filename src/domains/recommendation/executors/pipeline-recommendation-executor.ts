@@ -1,87 +1,325 @@
 import type {
-  CatalogRepository,
-  SearchAdapter,
-  SelectorAdapter,
-} from "../../../contracts/ports";
-import { RESULT_LIMIT } from "../../../config/recommendation";
-import { filterCatalog } from "../../catalog/filtering";
-import { scoreSearchResults } from "../scoring";
+  RecommendationSearchAdapter,
+  RecommendationSelectorAdapter,
+} from "../../../contracts/mvp-ports";
 import type {
-  RecommendationExecutionContext,
-  RecommendationExecutionResult,
-  RecommendationExecutor,
+  ExecutionMode,
+  FallbackReason,
+  RuleBasedFallbackInput,
+  SelectorOutput,
+} from "../../../contracts/mvp-recommendation";
+import type {
+  RecommendationSearchContinuation,
+  RecommendationSearchOutput,
+  SanitizedRecommendationSearchInput,
+} from "../../../contracts/mvp-search";
+import type { CatalogRepository } from "../../../contracts/ports";
+import type { RecommendationItem } from "../../../contracts/recommendation";
+import { RESULT_LIMIT } from "../../../config/recommendation";
+import { filterMvpCatalog } from "../../catalog/filtering";
+import {
+  BudgetExceededError,
+} from "../budget";
+import { scoreMvpSearchResults } from "../scoring";
+import type {
+  ExecutionAttempt,
+  MvpRecommendationExecutionContext,
+  MvpRecommendationExecutor,
 } from "./types";
 
+type ActiveExecutionMode = Exclude<ExecutionMode, "FALLBACK">;
+
+export interface PipelineRecommendationExecutorOptions {
+  executionMode?: ActiveExecutionMode;
+  resultLimit?: number;
+  now?: () => number;
+}
+
+const SELECTOR_TIMEOUT_ERROR_NAME =
+  "RecommendationSelectorTimeoutError";
+const SELECTOR_INVALID_OUTPUT_ERROR_NAME =
+  "RecommendationSelectorInvalidOutputError";
+
+class SelectorOutputValidationError extends Error {
+  constructor() {
+    super("The recommendation selector output failed validation.");
+    this.name = SELECTOR_INVALID_OUTPUT_ERROR_NAME;
+  }
+}
+
+const normalizeLimit = (limit: number): number =>
+  Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+
+const sanitizeSearchInput = (
+  input: MvpRecommendationExecutionContext["searchInvocation"]["input"],
+): SanitizedRecommendationSearchInput => ({
+  selectedProviders: [...input.selectedProviders],
+  companions: [...input.companions],
+  moods: [...input.moods],
+  desiredGenres: [...input.desiredGenres],
+  companionAvoidGenres: [...input.companionAvoidGenres],
+  maxRuntimeMinutes: input.maxRuntimeMinutes,
+  originPreference: input.originPreference,
+  hasNaturalLanguage: input.hasNaturalLanguage,
+});
+
+const uniqueItems = (
+  items: readonly RecommendationItem[],
+): RecommendationItem[] => [
+  ...new Map(items.map((item) => [item.content.id, item])).values(),
+];
+
+const readErrorName = (error: unknown): string | null =>
+  typeof error === "object" &&
+  error !== null &&
+  typeof (error as { name?: unknown }).name === "string"
+    ? (error as { name: string }).name
+    : null;
+
+const readErrorTokenUsage = (error: unknown): number => {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    typeof (error as { tokenUsage?: unknown }).tokenUsage !== "number"
+  ) {
+    return 0;
+  }
+  const tokenUsage = (error as { tokenUsage: number }).tokenUsage;
+  return Number.isFinite(tokenUsage) && tokenUsage > 0
+    ? Math.floor(tokenUsage)
+    : 0;
+};
+
+const toFallbackReason = (error: unknown): FallbackReason => {
+  if (error instanceof BudgetExceededError) {
+    return "BUDGET_EXCEEDED";
+  }
+
+  const name = readErrorName(error);
+  if (name === SELECTOR_TIMEOUT_ERROR_NAME) {
+    return "MODEL_TIMEOUT";
+  }
+  if (name === SELECTOR_INVALID_OUTPUT_ERROR_NAME) {
+    return "MODEL_INVALID_OUTPUT";
+  }
+  return "MODEL_ERROR";
+};
+
+function consumeSearchModelUsage(
+  output: RecommendationSearchOutput,
+  context: MvpRecommendationExecutionContext,
+): void {
+  if (
+    (output.modelCallCount !== 0 && output.modelCallCount !== 1) ||
+    !Number.isInteger(output.tokenUsage) ||
+    output.tokenUsage < 0 ||
+    (output.modelCallCount === 0 && output.tokenUsage !== 0)
+  ) {
+    throw new Error("Recommendation search model usage is malformed.");
+  }
+  if (output.modelCallCount === 1) {
+    context.budget.consumeModel(output.tokenUsage);
+  }
+}
+
+function validateSelectorOutput(
+  output: SelectorOutput,
+  candidates: readonly RecommendationItem[],
+  limit: number,
+): void {
+  if (
+    !Number.isFinite(output.tokenUsage) ||
+    output.tokenUsage < 0 ||
+    !Number.isInteger(output.tokenUsage)
+  ) {
+    throw new SelectorOutputValidationError();
+  }
+
+  const allowedIds = new Set(
+    candidates.map(({ content }) => content.id),
+  );
+  if (
+    !Array.isArray(output.selectedIds) ||
+    output.selectedIds.length > limit ||
+    (candidates.length > 0 &&
+      limit > 0 &&
+      output.selectedIds.length === 0) ||
+    output.selectedIds.some(
+      (id) => typeof id !== "string" || !allowedIds.has(id),
+    ) ||
+    new Set(output.selectedIds).size !== output.selectedIds.length
+  ) {
+    throw new SelectorOutputValidationError();
+  }
+
+  if (
+    output.topPickReason !== undefined &&
+    (typeof output.topPickReason !== "string" ||
+      output.topPickReason.trim().length === 0 ||
+      output.topPickReason.length > 180)
+  ) {
+    throw new SelectorOutputValidationError();
+  }
+}
+
+function selectItems(
+  output: SelectorOutput,
+  candidates: readonly RecommendationItem[],
+): RecommendationItem[] {
+  const byId = new Map(
+    candidates.map((item) => [item.content.id, item]),
+  );
+  return output.selectedIds.map((id, index) => {
+    const item = byId.get(id);
+    if (!item) {
+      throw new SelectorOutputValidationError();
+    }
+    if (index !== 0 || output.topPickReason === undefined) {
+      return item;
+    }
+
+    const reasons = [
+      output.topPickReason.trim(),
+      ...item.reasons,
+    ].filter(
+      (reason, reasonIndex, allReasons) =>
+        allReasons.indexOf(reason) === reasonIndex,
+    );
+    return {
+      ...item,
+      reasons: reasons.slice(0, 3),
+    };
+  });
+}
+
+function createFallbackAttempt(
+  reason: FallbackReason,
+  context: MvpRecommendationExecutionContext,
+  startedAt: number,
+  now: () => number,
+  eligibleCatalog: RuleBasedFallbackInput["eligibleCatalog"],
+  searchInput: SanitizedRecommendationSearchInput,
+  continuation: RecommendationSearchContinuation,
+  excludedContentIds: string[],
+): ExecutionAttempt {
+  return {
+    kind: "fallback_required",
+    reason,
+    budgetSnapshot: context.budget.snapshot(),
+    durationMs: Math.max(0, now() - startedAt),
+    fallbackInput: {
+      eligibleCatalog: [...eligibleCatalog],
+      searchInput,
+      continuation,
+      excludedContentIds: [...excludedContentIds],
+    },
+  };
+}
+
 export class PipelineRecommendationExecutor
-  implements RecommendationExecutor
+  implements MvpRecommendationExecutor
 {
+  private readonly executionMode: ActiveExecutionMode;
+  private readonly resultLimit: number;
+  private readonly now: () => number;
+
   constructor(
     private readonly catalog: CatalogRepository,
-    private readonly search: SearchAdapter,
-    private readonly selector: SelectorAdapter,
-  ) {}
+    private readonly search: RecommendationSearchAdapter,
+    private readonly selector: RecommendationSelectorAdapter,
+    options: PipelineRecommendationExecutorOptions = {},
+  ) {
+    this.executionMode = options.executionMode ?? "DETERMINISTIC";
+    this.resultLimit = normalizeLimit(
+      options.resultLimit ?? RESULT_LIMIT,
+    );
+    this.now = options.now ?? Date.now;
+  }
 
   async execute(
-    context: RecommendationExecutionContext,
-  ): Promise<RecommendationExecutionResult> {
+    context: MvpRecommendationExecutionContext,
+  ): Promise<ExecutionAttempt> {
+    const startedAt = this.now();
+    const searchInput = sanitizeSearchInput(
+      context.searchInvocation.input,
+    );
+
     const allContents = await context.budget.runTool(() =>
       this.catalog.list(),
     );
-    const filtered = filterCatalog(allContents, context.searchInput);
-    await context.trace.emit("filter", {
-      title: "필수 조건을 먼저 확인했어요",
-      description:
-        "연령, 국내 시청 가능 여부, 구독 OTT, 시청 시간과 제외 설정을 코드로 검사했습니다.",
-      metrics: {
-        전체: allContents.length,
-        통과: filtered.eligible.length,
-        제외: filtered.excluded.length,
-      },
-    });
-
-    const searchResults = await context.budget.runTool(() =>
-      this.search.search(context.searchInput, filtered.eligible),
+    const filtered = filterMvpCatalog(allContents, searchInput);
+    const excludedContentIds = filtered.excluded.map(
+      ({ content }) => content.id,
     );
-    await context.trace.emit("vector_search", {
-      title: "현재 취향과 가까운 작품을 찾았어요",
-      description: context.searchInput.naturalLanguage.trim()
-        ? "입력한 자연어 문장을 원문 저장 없이 의미 검색 기준으로 사용했습니다."
-        : "선택한 동반자, 분위기, 장르 칩을 한 문장으로 조합해 로컬 의미 검색을 실행했습니다.",
-      metrics: {
-        검색후보: searchResults.length,
-        로컬검색: true,
-      },
-    });
 
-    const ranked = scoreSearchResults(searchResults, context.searchInput);
-    await context.trace.emit("score", {
-      title: "여섯 가지 기준으로 점수를 계산했어요",
-      description:
-        "의미 유사도, 분위기, 장르, 시간, 작품 품질, 동반자 적합도를 정규화하고 컬렉션 중복을 감점했습니다.",
-      metrics: {
-        점수계산: ranked.length,
-        자연어가중치: Boolean(context.searchInput.naturalLanguage.trim()),
-      },
-    });
-
-    const selected = this.selector.select(ranked, RESULT_LIMIT);
-    await context.trace.emit("select", {
-      title: `${selected.length}편을 결정론적으로 골랐어요`,
-      description:
-        "같은 입력은 같은 결과가 되도록 점수와 제목 순서로 안정적으로 정렬했습니다.",
-      metrics: {
-        최종후보: selected.length,
-      },
-    });
-    context.budget.assertWithinLimits();
-
-    return {
-      ranked,
-      selected,
-      excludedContentIds: filtered.excluded.map(
-        ({ content }) => content.id,
+    const searchOutput = await context.budget.runTool((signal) =>
+      this.search.search(
+        context.searchInvocation,
+        filtered.eligible,
+        signal,
       ),
-      eligibleCount: filtered.eligible.length,
-    };
+    );
+    const ranked = uniqueItems(
+      scoreMvpSearchResults(searchOutput.results, searchInput),
+    );
+
+    try {
+      consumeSearchModelUsage(searchOutput, context);
+      const selectorOutput =
+        context.selectionMode === "ranked"
+          ? {
+              selectedIds: ranked
+                .slice(0, this.resultLimit)
+                .map(({ content }) => content.id),
+              tokenUsage: 0,
+            }
+          : this.executionMode === "OPENAI"
+            ? await context.budget.runModel(
+                (signal) =>
+                  this.selector.select(
+                    ranked,
+                    this.resultLimit,
+                    signal,
+                  ),
+                (output) => output.tokenUsage,
+                readErrorTokenUsage,
+              )
+            : await this.selector.select(ranked, this.resultLimit);
+
+      validateSelectorOutput(
+        selectorOutput,
+        ranked,
+        this.resultLimit,
+      );
+      context.budget.assertWithinLimits();
+
+      const durationMs = Math.max(0, this.now() - startedAt);
+      return {
+        kind: "success",
+        result: {
+          ranked,
+          selected: selectItems(selectorOutput, ranked),
+          excludedContentIds,
+          eligibleCount: filtered.eligible.length,
+          continuation: searchOutput.continuation,
+          executionMode: this.executionMode,
+          fallbackUsed: false,
+          fallbackReason: null,
+          budgetSnapshot: context.budget.snapshot(),
+          durationMs,
+        },
+      };
+    } catch (error) {
+      return createFallbackAttempt(
+        toFallbackReason(error),
+        context,
+        startedAt,
+        this.now,
+        filtered.eligible,
+        searchInput,
+        searchOutput.continuation,
+        excludedContentIds,
+      );
+    }
   }
 }

@@ -21,14 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s · OTT 다모아",
     },
     description:
-      "구독 중인 OTT 안에서 지금 볼 작품 5편을 고르고, 추천 과정과 안전 정책까지 확인하는 로컬 Demo.",
+      "볼 수 있는 OTT 안에서 지금 볼 작품 5편을 고르고, 추천 과정과 안전 정책까지 확인하는 익명 추천 서비스.",
     icons: {
       icon: "/favicon.svg",
       shortcut: "/favicon.svg",
     },
     openGraph: {
       title: "OTT 다모아 — 오늘 볼 작품, 1분 안에",
-      description: "검색보다 결정. 조건을 지키는 투명한 OTT 추천 Demo.",
+      description: "검색보다 결정. 조건을 지키는 투명한 OTT 추천 서비스.",
       type: "website",
       locale: "ko_KR",
       images: [{ url: imageUrl, width: 1732, height: 908 }],
@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "OTT 다모아 — 오늘 볼 작품, 1분 안에",
-      description: "검색보다 결정. 조건을 지키는 투명한 OTT 추천 Demo.",
+      description: "검색보다 결정. 조건을 지키는 투명한 OTT 추천 서비스.",
       images: [imageUrl],
     },
   };

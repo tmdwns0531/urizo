@@ -1,4 +1,4 @@
-import { services } from "@/composition";
+import { withMvpComposition } from "@/composition";
 import {
   badRequest,
   errorResponse,
@@ -16,13 +16,11 @@ export async function GET(
   try {
     const { runId: rawRunId } = await context.params;
     const runId = rawRunId.trim();
-    if (!runId) {
-      throw badRequest("runId 값이 필요합니다.");
-    }
-    const response = await services.getRun(runId);
-    if (!response) {
-      throw notFound("추천 기록을 찾을 수 없습니다.");
-    }
+    if (!runId) throw badRequest("runId 값이 필요합니다.");
+    const response = await withMvpComposition(({ services }) =>
+      services.getRun(runId),
+    );
+    if (!response) throw notFound("추천 기록을 찾을 수 없습니다.");
     return Response.json(response);
   } catch (error) {
     return errorResponse(error);
