@@ -160,12 +160,18 @@ export type QueryVectorHasNoTextDiagnostics = Assert<
 export type QueryVectorShapeIsFixed = Assert<
   IsExact<
     QueryVectorSnapshot,
-    {
-      algorithm: "local-hash-cosine-v1";
-      version: 1;
-      dimensions: 64;
-      values: number[];
-    }
+    | {
+        algorithm: "local-hash-cosine-v1";
+        version: 1;
+        dimensions: 64;
+        values: number[];
+      }
+    | {
+        algorithm: "openai-text-embedding-3-small-v1";
+        version: 1;
+        dimensions: 1536;
+        values: number[];
+      }
   >
 >;
 
@@ -201,7 +207,7 @@ export type SearchResultHasNoMatchedTerms = Assert<
 export type SearchOutputCarriesContinuation = Assert<
   IsExact<
     keyof RecommendationSearchOutput,
-    "results" | "continuation"
+    "results" | "continuation" | "modelCallCount" | "tokenUsage"
   >
 >;
 
@@ -397,6 +403,23 @@ export type HealthAndResetDtosAreExact = Assert<
   IsExact<MvpApiContract["health"]["response"], HealthResponse>
 >;
 
+export type HealthDtoSupportsDemoAndLiveAdapters = Assert<
+  IsExact<
+    HealthResponse["adapters"],
+    {
+      catalog: "fixture" | "prisma";
+      search: "local" | "pgvector";
+      selector: "deterministic" | "openai";
+      runStore: "memory" | "prisma";
+      traceStore: "memory" | "prisma";
+    }
+  >
+>;
+
+export type HealthDtoHasBothProfileFlags = Assert<
+  IsExact<HealthResponse["fullyDemo" | "fullyLive"], boolean>
+>;
+
 export type ResetDtoIsExact = Assert<
   IsExact<MvpApiContract["resetDemo"]["response"], DemoResetResponse>
 >;
@@ -436,7 +459,7 @@ export type MvpCompositionUsesActiveSet = Assert<
 >;
 
 export type MvpCompositionKeysAreExact = Assert<
-  IsExact<keyof MvpComposition, "adapters" | "services">
+  IsExact<keyof MvpComposition, "adapters" | "services" | "dispose">
 >;
 
 export type AnonymousServiceMethodsAreExact = Assert<
@@ -457,6 +480,13 @@ export type ActiveExecutorContextIsExact = Assert<
   IsExact<
     Parameters<MvpRecommendationExecutor["execute"]>[0],
     MvpRecommendationExecutionContext
+  >
+>;
+
+export type ActiveExecutorContextKeysAreExact = Assert<
+  IsExact<
+    keyof MvpRecommendationExecutionContext,
+    "runId" | "searchInvocation" | "budget" | "selectionMode"
   >
 >;
 
@@ -550,4 +580,5 @@ export const owner1CompositionMock = {
     traces: owner5TraceMock,
   },
   services: owner5ServiceMock,
+  async dispose() {},
 } satisfies MvpComposition;

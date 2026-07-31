@@ -1,7 +1,6 @@
 "use client";
 
 import type { RecommendationItem } from "@/contracts/recommendation";
-import { EngagementActions } from "./engagement-actions";
 import { PosterArt } from "./poster-art";
 import { ProviderBadge } from "./provider-badge";
 
@@ -15,10 +14,15 @@ function mediaLabel(mediaType: RecommendationItem["content"]["mediaType"]) {
   return mediaType === "MOVIE" ? "영화" : "시리즈";
 }
 
+function providerActionLabel(
+  linkType: RecommendationItem["content"]["providers"][number]["linkType"],
+) {
+  return linkType === "DIRECT" ? "바로 보기" : "OTT에서 찾기";
+}
+
 type ContentCardProps = {
   item: RecommendationItem;
   rank: number;
-  runId: string;
   hero?: boolean;
   onReplace?: (contentId: string) => void;
   replacing?: boolean;
@@ -28,7 +32,6 @@ type ContentCardProps = {
 export function ContentCard({
   item,
   rank,
-  runId,
   hero = false,
   onReplace,
   replacing = false,
@@ -37,19 +40,6 @@ export function ContentCard({
   const { content } = item;
   const provider = content.providers[0];
 
-  function recordOttClick(providerName: string) {
-    void fetch("/api/engagement", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contentId: content.id,
-        runId,
-        type: "OTT_CLICK",
-        provider: providerName,
-      }),
-      keepalive: true,
-    }).catch(() => undefined);
-  }
 
   if (hero) {
     return (
@@ -106,16 +96,14 @@ export function ContentCard({
                 href={provider.watchUrl}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => recordOttClick(provider.provider)}
-                aria-label={`${content.title} ${provider.provider}에서 찾기, 새 창`}
+                aria-label={`${content.title} ${providerActionLabel(provider.linkType)}, 새 창`}
               >
-                OTT에서 찾기 <span aria-hidden="true">↗</span>
+                {providerActionLabel(provider.linkType)} <span aria-hidden="true">↗</span>
               </a>
             ) : (
               <span className="button button--disabled">제공처 확인 중</span>
             )}
           </div>
-          <EngagementActions contentId={content.id} runId={runId} />
           {onReplace ? (
             <button
               type="button"
@@ -165,10 +153,9 @@ export function ContentCard({
               href={provider.watchUrl}
               target="_blank"
               rel="noreferrer"
-              onClick={() => recordOttClick(provider.provider)}
-              aria-label={`${content.title} OTT에서 찾기, 새 창`}
+              aria-label={`${content.title} ${providerActionLabel(provider.linkType)}, 새 창`}
             >
-              OTT에서 찾기 <span aria-hidden="true">↗</span>
+              {providerActionLabel(provider.linkType)} <span aria-hidden="true">↗</span>
             </a>
           ) : null}
           {onReplace ? (
@@ -182,7 +169,6 @@ export function ContentCard({
             </button>
           ) : null}
         </div>
-        <EngagementActions contentId={content.id} runId={runId} compact />
       </div>
     </article>
   );

@@ -35,6 +35,9 @@ export type ChoiceRuntimeMinutes = (typeof CHOICE_RUNTIME_MINUTES)[number];
 export type EffectiveRuntimeMinutes = ChoiceRuntimeMinutes | 45;
 
 export const NATURAL_LANGUAGE_MAX_CODE_POINTS = 140;
+export const MVP_GENRE_MAX_ITEMS = 20;
+export const MVP_GENRE_MAX_CODE_POINTS = 40;
+export const MVP_RECOMMENDATION_REQUEST_MAX_BYTES = 16_384;
 
 /**
  * Natural-language text is a transient public DTO value. The request parser
@@ -77,12 +80,34 @@ export interface MvpDemoRecommendationRequest
   scenario?: MvpDemoScenario;
 }
 
-export interface QueryVectorSnapshot {
+export const LOCAL_QUERY_VECTOR_ALGORITHM = "local-hash-cosine-v1";
+export const LOCAL_QUERY_VECTOR_DIMENSIONS = 64;
+export const OPENAI_QUERY_VECTOR_ALGORITHM =
+  "openai-text-embedding-3-small-v1";
+export const OPENAI_QUERY_VECTOR_MODEL = "text-embedding-3-small";
+export const OPENAI_QUERY_VECTOR_DIMENSIONS = 1536;
+
+export interface LocalQueryVectorSnapshot {
   algorithm: "local-hash-cosine-v1";
   version: 1;
   dimensions: 64;
   values: number[];
 }
+
+export interface OpenAiQueryVectorSnapshot {
+  algorithm: "openai-text-embedding-3-small-v1";
+  version: 1;
+  dimensions: 1536;
+  values: number[];
+}
+
+/**
+ * Persistence-safe vector continuation. The algorithm discriminator prevents
+ * a local 64-dimensional vector from being sent to pgvector (and vice versa).
+ */
+export type QueryVectorSnapshot =
+  | LocalQueryVectorSnapshot
+  | OpenAiQueryVectorSnapshot;
 
 export type InputFingerprint = `sha256:${string}`;
 
@@ -130,6 +155,8 @@ export interface RecommendationSearchResult {
 export interface RecommendationSearchOutput {
   results: RecommendationSearchResult[];
   continuation: RecommendationSearchContinuation;
+  modelCallCount: 0 | 1;
+  tokenUsage: number;
 }
 
 export const MVP_NEUTRAL_CHOICE = {

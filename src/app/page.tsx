@@ -33,21 +33,21 @@ export default function HomePage() {
               <em>1분 안에 결정해요.</em>
             </h1>
             <p className="landing-copy__lead">
-              구독 중인 OTT와 지금 기분만 알려주세요. 조건을 몰래 바꾸지
+              이번에 볼 OTT와 지금 기분만 알려주세요. 조건을 몰래 바꾸지
               않고, 딱 5편과 고른 이유까지 보여드릴게요.
             </p>
             <div className="landing-actions">
-              <Link href="/login" className="button button--primary button--large">
-                Demo 시작하기 <span aria-hidden="true">→</span>
+              <Link href="/choice" className="button button--primary button--large">
+                추천 시작하기 <span aria-hidden="true">→</span>
               </Link>
               <a href="#transparent" className="button button--ghost button--large">
                 추천 원칙 보기
               </a>
             </div>
-            <div className="landing-proof" aria-label="데모 실행 조건">
-              <span>✓ 로그인 키 없음</span>
-              <span>✓ DB 없음</span>
-              <span>✓ AI 키 없음</span>
+            <div className="landing-proof" aria-label="실행 원칙">
+              <span>✓ 로그인 없이 시작</span>
+              <span>✓ Demo는 키 없이 실행</span>
+              <span>✓ LIVE는 선택 기능만 연결</span>
             </div>
           </div>
 
@@ -57,7 +57,7 @@ export default function HomePage() {
                 <span className="demo-live-dot" />
                 <strong>지금 조건을 지키는 중</strong>
               </div>
-              <span>Demo</span>
+              <span>Preview</span>
             </div>
             <div className="landing-demo__prompt">
               <p>오늘은 이렇게 볼게요</p>

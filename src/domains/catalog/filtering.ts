@@ -1,4 +1,5 @@
 import type { CatalogContent } from "../../contracts/catalog";
+import type { SanitizedRecommendationSearchInput } from "../../contracts/mvp-search";
 import type { SearchInput } from "../../contracts/search";
 
 export const FILTER_REASONS = [
@@ -29,12 +30,100 @@ export interface FilterResult {
 const intersects = (left: readonly string[], right: readonly string[]): boolean =>
   left.some((item) => right.includes(item));
 
+const isKoreanContent = (content: CatalogContent): boolean =>
+  content.originCountries.includes("KR") ||
+  content.productionCountries.includes("KR");
+
+/**
+ * Anonymous eligibility is intentionally independent of UserContext. `18` and
+ * `UNKNOWN` are always unsafe; WITH_CHILDREN further limits results to
+ * ALL/7/12. Natural language is not consulted for any mandatory filter.
+ */
+export function getMvpFilterReasons(
+  content: CatalogContent,
+  input: SanitizedRecommendationSearchInput,
+): FilterReason[] {
+  const reasons: FilterReason[] = [];
+
+  if (content.ageRating === "18") {
+    reasons.push("AGE_RESTRICTED");
+  }
+  if (content.ageRating === "UNKNOWN") {
+    reasons.push("RATING_UNKNOWN_FOR_MINOR");
+  }
+  if (
+    input.companions.includes("WITH_CHILDREN") &&
+    !["ALL", "7", "12"].includes(content.ageRating) &&
+    !reasons.includes("AGE_RESTRICTED") &&
+    !reasons.includes("RATING_UNKNOWN_FOR_MINOR")
+  ) {
+    reasons.push("AGE_RESTRICTED");
+  }
+
+  if (content.providers.length === 0) {
+    reasons.push("NOT_AVAILABLE_IN_KOREA");
+  } else if (
+    !content.providers.some(({ provider }) =>
+      input.selectedProviders.includes(provider),
+    )
+  ) {
+    reasons.push("UNSUBSCRIBED_PROVIDER");
+  }
+
+  if (
+    input.maxRuntimeMinutes !== null &&
+    content.runtimeMinutes > input.maxRuntimeMinutes
+  ) {
+    reasons.push("RUNTIME_EXCEEDED");
+  }
+
+  const isKorean = isKoreanContent(content);
+  if (
+    (input.originPreference === "KR" && !isKorean) ||
+    (input.originPreference === "NON_KR" && isKorean)
+  ) {
+    reasons.push("ORIGIN_MISMATCH");
+  }
+
+  const explicitlyRequested = intersects(
+    content.genres,
+    input.desiredGenres,
+  );
+  if (
+    !explicitlyRequested &&
+    intersects(content.genres, input.companionAvoidGenres)
+  ) {
+    reasons.push("COMPANION_AVOID_GENRE");
+  }
+
+  return reasons;
+}
+
+export function filterMvpCatalog(
+  contents: readonly CatalogContent[],
+  input: SanitizedRecommendationSearchInput,
+): FilterResult {
+  const eligible: CatalogContent[] = [];
+  const excluded: ExcludedContent[] = [];
+
+  for (const content of contents) {
+    const reasons = getMvpFilterReasons(content, input);
+    if (reasons.length === 0) {
+      eligible.push(content);
+    } else {
+      excluded.push({ content, reasons });
+    }
+  }
+
+  return { eligible, excluded };
+}
+
 const isExplicitlyOverridden = (
   content: CatalogContent,
   input: SearchInput,
 ): boolean => intersects(content.genres, input.explicitlyRequestedGenres);
 
-export function getFilterReasons(
+function getLegacyFilterReasons(
   content: CatalogContent,
   input: SearchInput,
 ): FilterReason[] {
@@ -68,9 +157,7 @@ export function getFilterReasons(
     reasons.push("UNSUBSCRIBED_PROVIDER");
   }
 
-  const isKorean =
-    content.originCountries.includes("KR") ||
-    content.productionCountries.includes("KR");
+  const isKorean = isKoreanContent(content);
   if (
     (input.originPreference === "KR" && !isKorean) ||
     (input.originPreference === "NON_KR" && isKorean)
@@ -101,15 +188,44 @@ export function getFilterReasons(
   return reasons;
 }
 
+export function getFilterReasons(
+  content: CatalogContent,
+  input: SanitizedRecommendationSearchInput,
+): FilterReason[];
+/** @deprecated Transitional authenticated Demo overload. */
+export function getFilterReasons(
+  content: CatalogContent,
+  input: SearchInput,
+): FilterReason[];
+export function getFilterReasons(
+  content: CatalogContent,
+  input: SanitizedRecommendationSearchInput | SearchInput,
+): FilterReason[] {
+  return "user" in input
+    ? getLegacyFilterReasons(content, input)
+    : getMvpFilterReasons(content, input);
+}
+
+export function filterCatalog(
+  contents: readonly CatalogContent[],
+  input: SanitizedRecommendationSearchInput,
+): FilterResult;
+/** @deprecated Transitional authenticated Demo overload. */
 export function filterCatalog(
   contents: readonly CatalogContent[],
   input: SearchInput,
+): FilterResult;
+export function filterCatalog(
+  contents: readonly CatalogContent[],
+  input: SanitizedRecommendationSearchInput | SearchInput,
 ): FilterResult {
   const eligible: CatalogContent[] = [];
   const excluded: ExcludedContent[] = [];
 
   for (const content of contents) {
-    const reasons = getFilterReasons(content, input);
+    const reasons = "user" in input
+      ? getLegacyFilterReasons(content, input)
+      : getMvpFilterReasons(content, input);
     if (reasons.length === 0) {
       eligible.push(content);
     } else {

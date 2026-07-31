@@ -463,7 +463,7 @@ test("v0.7 active TypeScript contract names are exported", async () => {
   }
 });
 
-test("ERD, Prisma schema, and migration share one exact persistence contract", async () => {
+test("v0.7 Run and Trace keep their accepted persistence contract", async () => {
   const [schema, migration, erd] = await Promise.all([
     read("prisma/schema.prisma"),
     read(
@@ -481,19 +481,45 @@ test("ERD, Prisma schema, and migration share one exact persistence contract", a
   const erdEntityNames = [...erd.matchAll(/^\s{2}(\w+) \{$/gm)].map(
     (match) => match[1],
   );
-  assert.deepEqual(modelNames, ["RecommendationRun", "AgentTrace"]);
+  assert.deepEqual(modelNames, [
+    "RecommendationRun",
+    "AgentTrace",
+    "CatalogContent",
+    "ProviderAvailability",
+    "ContentSearchDocument",
+    "ContentEmbedding",
+  ]);
   assert.deepEqual(tableNames, ["recommendation_runs", "agent_traces"]);
   assert.deepEqual(erdEntityNames, ["RecommendationRun", "AgentTrace"]);
 
   const runFields = parsePrismaModel(schema, "RecommendationRun").filter(
-    (field) => field.name !== "traces",
+    (field) => field.name !== "traces" && field.name !== "nextTraceSequence",
   );
   const traceFields = parsePrismaModel(schema, "AgentTrace").filter(
     (field) => field.name !== "run",
   );
+  const v08NullableStagingFields = new Set([
+    "executionMode",
+    "inputFingerprint",
+    "queryVector",
+  ]);
+  for (const field of runFields.filter(({ name }) =>
+    v08NullableStagingFields.has(name),
+  )) {
+    assert.equal(field.nullable, true, `${field.name} v0.8 staging nullability`);
+  }
+  const v07ComparableRunFields = runFields.map((field) =>
+    v08NullableStagingFields.has(field.name)
+      ? {
+          ...field,
+          type: field.type.replace(/\?$/, ""),
+          nullable: false,
+        }
+      : field,
+  );
   assertPersistenceLayer(
     runContract,
-    runFields,
+    v07ComparableRunFields,
     parseSqlTable(migration, "recommendation_runs"),
     parseMermaidEntity(erd, "RecommendationRun"),
   );
@@ -557,6 +583,45 @@ test("ERD, Prisma schema, and migration share one exact persistence contract", a
     migration,
     /UNIQUE INDEX "agent_traces_run_sequence_key".+\("run_id", "sequence"\)/,
   );
+
+  const forbiddenPersistenceNames =
+    /\b(userId|userSnapshot|naturalLanguage|matchedTerms|rawPrompt)\b/;
+  assert.doesNotMatch(schema, forbiddenPersistenceNames);
+  assert.doesNotMatch(migration, forbiddenPersistenceNames);
+  assert.doesNotMatch(
+    migration,
+    /DATABASE_URL|DIRECT_URL|postgres(?:ql)?:\/\/|api[_-]?key|secret/i,
+  );
+});
+test("v0.8 migration adds only anonymous LIVE catalog and vector storage", async () => {
+  const [schema, migration, erd] = await Promise.all([
+    read("prisma/schema.prisma"),
+    read(
+      "prisma/migrations/20260731160000_v08_live_catalog_vector/migration.sql",
+    ),
+    read("docs/ERD-v0.8-live.md"),
+  ]);
+
+  const tables = [...migration.matchAll(/CREATE TABLE "([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(tables, [
+    "catalog_contents",
+    "provider_availabilities",
+    "content_search_documents",
+    "content_embeddings",
+  ]);
+  assert.match(migration, /CREATE EXTENSION "vector" WITH SCHEMA "extensions"/);
+  assert.match(migration, /ALTER EXTENSION "vector" SET SCHEMA "extensions"/);
+  assert.match(migration, /ADD COLUMN "next_trace_sequence" INTEGER NOT NULL/);
+  assert.match(migration, /extensions\.vector\(1536\)/);
+  assert.match(migration, /USING hnsw \("embedding" extensions\.vector_cosine_ops\)/);
+  assert.match(schema, /model CatalogContent \{/);
+  assert.match(schema, /model ProviderAvailability \{/);
+  assert.match(schema, /model ContentSearchDocument \{/);
+  assert.match(schema, /model ContentEmbedding \{/);
+  assert.match(schema, /Unsupported\("vector\(1536\)"\)/);
+  assert.match(erd, /ContentEmbedding/);
 
   const forbiddenPersistenceNames =
     /\b(userId|userSnapshot|naturalLanguage|matchedTerms|rawPrompt)\b/;
@@ -672,11 +737,11 @@ test("runtime allowlists and budget limits match v0.6 and v0.7", async () => {
   ]);
 });
 
-test("MVP adapter config validates real credentials only when selected", async () => {
+test("MVP adapter config selects real Demo and LIVE presets conditionally", async () => {
   const config = await loadStandaloneTypeScriptModule(
     "src/config/adapters.ts",
   );
-  const defaults = {
+  const demo = {
     appProfile: "demo",
     catalog: "fixture",
     search: "local",
@@ -684,41 +749,91 @@ test("MVP adapter config validates real credentials only when selected", async (
     runStore: "memory",
     traceStore: "memory",
   };
-  assert.deepEqual(config.MVP_DEFAULT_ADAPTER_CONFIG, defaults);
-  assert.deepEqual(config.readMvpAdapterConfig({}), defaults);
-  assert.equal(config.isFullyMvpDemoConfig(defaults), true);
-  assert.doesNotThrow(() =>
-    config.validateSelectedMvpAdapters(defaults, {}),
-  );
-
-  const prismaSelected = {
-    ...defaults,
+  const live = {
+    appProfile: "live",
+    catalog: "prisma",
+    search: "pgvector",
+    selector: "openai",
     runStore: "prisma",
+    traceStore: "prisma",
   };
+
+  assert.deepEqual(config.MVP_DEFAULT_ADAPTER_CONFIG, demo);
+  assert.deepEqual(config.MVP_LIVE_ADAPTER_CONFIG, live);
+  assert.deepEqual(config.readMvpAdapterConfig({}), demo);
+  assert.deepEqual(config.readMvpAdapterConfig({ APP_PROFILE: "live" }), live);
+  assert.deepEqual(
+    config.readMvpAdapterConfig({
+      OTT_DAMOA_PROFILE_OVERRIDE: "live",
+      APP_PROFILE: "demo",
+      CATALOG_ADAPTER: "fixture",
+      SEARCH_ADAPTER: "local",
+      SELECTOR_ADAPTER: "deterministic",
+      RUN_STORE: "memory",
+      TRACE_STORE: "memory",
+    }),
+    live,
+  );
+  assert.equal(config.isFullyMvpDemoConfig(demo), true);
+  assert.equal(config.isFullyMvpLiveConfig(live), true);
+  assert.doesNotThrow(() => config.validateSelectedMvpAdapters(demo, {}));
+
+  const prismaSelected = { ...demo, runStore: "prisma" };
   assert.throws(
     () => config.validateSelectedMvpAdapters(prismaSelected, {}),
-    /DATABASE_URL, DIRECT_URL/,
+    /DATABASE_URL/,
   );
   assert.doesNotThrow(() =>
     config.validateSelectedMvpAdapters(prismaSelected, {
       DATABASE_URL: "provided-by-runtime-secret-store",
-      DIRECT_URL: "provided-by-runtime-secret-store",
     }),
   );
 
-  const openAiSelected = {
-    ...defaults,
-    selector: "openai",
-  };
   assert.throws(
-    () => config.validateSelectedMvpAdapters(openAiSelected, {}),
-    /OPENAI_API_KEY/,
+    () => config.validateSelectedMvpAdapters(live, {}),
+    /DATABASE_URL.*OPENAI_API_KEY.*OPENAI_EMBEDDING_MODEL.*OPENAI_EMBEDDING_DIMENSIONS.*OPENAI_GENERATION_MODEL/,
+  );
+  assert.doesNotThrow(() =>
+    config.validateSelectedMvpAdapters(live, {
+      DATABASE_URL: "provided-by-runtime-secret-store",
+      OPENAI_API_KEY: "provided-by-runtime-secret-store",
+      OPENAI_EMBEDDING_MODEL: "text-embedding-3-small",
+      OPENAI_EMBEDDING_DIMENSIONS: "1536",
+      OPENAI_GENERATION_MODEL: "gpt-5.6-terra",
+    }),
+  );
+  assert.throws(
+    () =>
+      config.validateSelectedMvpAdapters(live, {
+        DATABASE_URL: "provided-by-runtime-secret-store",
+        OPENAI_API_KEY: "provided-by-runtime-secret-store",
+        OPENAI_EMBEDDING_MODEL: "wrong-model",
+        OPENAI_EMBEDDING_DIMENSIONS: "1536",
+        OPENAI_GENERATION_MODEL: "gpt-5.6-terra",
+      }),
+    /OPENAI_EMBEDDING_MODEL/,
   );
   assert.throws(
     () =>
       config.readMvpAdapterConfig({
-        CATALOG_ADAPTER: "prisma",
+        SEARCH_ADAPTER: "pgvector",
       }),
-    /CATALOG_ADAPTER must be one of fixture/,
+    /requires CATALOG_ADAPTER=prisma/,
+  );
+  assert.throws(
+    () =>
+      config.readMvpAdapterConfig({
+        RUN_STORE: "memory",
+        TRACE_STORE: "prisma",
+      }),
+    /TRACE_STORE=prisma requires RUN_STORE=prisma/,
+  );
+  assert.throws(
+    () =>
+      config.readMvpAdapterConfig({
+        RUN_STORE: "prisma",
+        TRACE_STORE: "memory",
+      }),
+    /RUN_STORE=prisma requires TRACE_STORE=prisma/,
   );
 });

@@ -1,74 +1,172 @@
 import {
-  readAdapterConfig,
-  validateSelectedLiveAdapters,
-  type AdapterConfig,
+  readMvpAdapterConfig,
+  validateSelectedMvpAdapters,
+  type MvpAdapterConfig,
 } from "../config/adapters";
+import type { DemoResettable } from "../contracts/mvp-ports";
 import { PipelineRecommendationExecutor } from "../domains/recommendation/executors/pipeline-recommendation-executor";
-import {
-  RecommendationOrchestrator,
-  type RecommendationServices,
-} from "../domains/recommendation/orchestrator";
+import { AnonymousRecommendationOrchestrator } from "../domains/recommendation/orchestrator";
 import { PolicyLayer } from "../domains/recommendation/policy";
-import { createDemoAdapters } from "./demo";
-import { resolveAdapters } from "./live";
+import { createDemoAdapters, type DemoAdapterSet } from "./demo";
+import { resolveMvpAdapters } from "./live";
 import type {
-  AdapterOverrides,
-  Composition,
+  MvpAdapterOverrides,
+  MvpComposition,
 } from "./types";
 
 type Environment = Record<string, string | undefined>;
 
-export function createComposition(
-  options: {
-    config?: AdapterConfig;
-    env?: Environment;
-    overrides?: AdapterOverrides;
-  } = {},
-): Composition {
-  const config = options.config ?? readAdapterConfig(options.env);
-  validateSelectedLiveAdapters(config, options.env);
-  const adapters = resolveAdapters(
-    config,
-    createDemoAdapters(),
-    options.overrides,
-  );
-  const executor = new PipelineRecommendationExecutor(
-    adapters.catalog,
-    adapters.search,
-    adapters.selector,
-  );
-  const policy = new PolicyLayer(adapters.catalog);
-  const services = new RecommendationOrchestrator({
-    auth: adapters.auth,
-    executor,
-    policy,
-    runs: adapters.runs,
-    traces: adapters.traces,
-    profiles: adapters.profiles,
-    engagements: adapters.engagements,
-  });
-
-  return { adapters, services };
+export interface CreateMvpCompositionOptions {
+  config?: MvpAdapterConfig;
+  env?: Environment;
+  overrides?: MvpAdapterOverrides;
+  demoAdapters?: DemoAdapterSet;
 }
 
+function isDemoResettable(value: unknown): value is DemoResettable {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { clearForDemo?: unknown }).clearForDemo === "function"
+  );
+}
+
+function usesPrisma(config: MvpAdapterConfig): boolean {
+  return (
+    config.catalog === "prisma" ||
+    config.search === "pgvector" ||
+    config.runStore === "prisma" ||
+    config.traceStore === "prisma"
+  );
+}
+
+export async function createMvpComposition(
+  options: CreateMvpCompositionOptions = {},
+): Promise<MvpComposition> {
+  const env = options.env ?? process.env;
+  const config = options.config ?? readMvpAdapterConfig(env);
+  validateSelectedMvpAdapters(config, env);
+
+  const demo = options.demoAdapters ?? createDemoAdapters();
+  const resolved = await resolveMvpAdapters(
+    config,
+    demo,
+    env,
+    options.overrides,
+  );
+  const adapters = resolved.adapters;
+
+  try {
+    const executor = new PipelineRecommendationExecutor(
+      adapters.catalog,
+      adapters.search,
+      adapters.selector,
+      {
+        executionMode:
+          config.selector === "openai" ? "OPENAI" : "DETERMINISTIC",
+      },
+    );
+    const policy = new PolicyLayer(adapters.catalog);
+    const demoReset =
+      config.appProfile === "demo" &&
+      isDemoResettable(adapters.runs) &&
+      isDemoResettable(adapters.traces)
+        ? { runs: adapters.runs, traces: adapters.traces }
+        : undefined;
+    const services = new AnonymousRecommendationOrchestrator({
+      appProfile: config.appProfile,
+      catalog: adapters.catalog,
+      executor,
+      policy,
+      runs: adapters.runs,
+      traces: adapters.traces,
+      persistence: resolved.persistence,
+      ...(demoReset ? { demoReset } : {}),
+    });
+
+    return {
+      adapters,
+      services,
+      dispose: resolved.dispose,
+    };
+  } catch (error) {
+    await resolved.dispose();
+    throw error;
+  }
+}
+
+export const createComposition = createMvpComposition;
+
+type CachedComposition = {
+  key: string;
+  promise: Promise<MvpComposition>;
+};
+
 type GlobalComposition = typeof globalThis & {
-  __ottDamoaComposition?: Composition;
+  __ottDamoaMvpComposition?: CachedComposition;
+  __ottDamoaDemoAdapters?: DemoAdapterSet;
 };
 
 const globalComposition = globalThis as GlobalComposition;
 
-export const composition =
-  globalComposition.__ottDamoaComposition ?? createComposition();
-
-if (process.env.NODE_ENV !== "production") {
-  globalComposition.__ottDamoaComposition = composition;
+function getSharedDemoAdapters(): DemoAdapterSet {
+  if (!globalComposition.__ottDamoaDemoAdapters) {
+    globalComposition.__ottDamoaDemoAdapters = createDemoAdapters();
+  }
+  return globalComposition.__ottDamoaDemoAdapters;
 }
 
-export const services: RecommendationServices = composition.services;
+/**
+ * Prisma-backed compositions are request-scoped because workerd TCP sockets
+ * and pg pools must not cross request boundaries. Non-Prisma compositions are
+ * safe to cache; shared memory Run/Trace stores remain stable across requests.
+ */
+export function getComposition(): Promise<MvpComposition> {
+  const env = process.env;
+  const config = readMvpAdapterConfig(env);
+  const demoAdapters = getSharedDemoAdapters();
+  if (usesPrisma(config)) {
+    return createMvpComposition({ config, env, demoAdapters });
+  }
 
-export type { RecommendationServices } from "../domains/recommendation/orchestrator";
+  const key = JSON.stringify(config);
+  const cached = globalComposition.__ottDamoaMvpComposition;
+  if (cached?.key === key) {
+    return cached.promise;
+  }
+
+  const entry: CachedComposition = {
+    key,
+    promise: createMvpComposition({ config, env, demoAdapters }),
+  };
+  entry.promise = entry.promise.catch((error) => {
+    if (globalComposition.__ottDamoaMvpComposition === entry) {
+      delete globalComposition.__ottDamoaMvpComposition;
+    }
+    throw error;
+  });
+  globalComposition.__ottDamoaMvpComposition = entry;
+  return entry.promise;
+}
+
+export async function withMvpComposition<T>(
+  operation: (composition: MvpComposition) => Promise<T>,
+): Promise<T> {
+  const composition = await getComposition();
+  try {
+    return await operation(composition);
+  } finally {
+    await composition.dispose();
+  }
+}
+
+export type { MvpComposition } from "./types";
+export type { AnonymousRecommendationServices } from "../contracts/mvp-recommendation";
 export type {
-  ApprovalDecision,
-  RecommendationRequest,
-  RecommendationResponse,
-} from "../contracts/recommendation";
+  MvpApprovalDecision,
+  MvpRecommendationResponse,
+} from "../contracts/mvp-recommendation";
+export type {
+  MvpDemoRecommendationRequest,
+  MvpRecommendationRequest,
+} from "../contracts/mvp-search";

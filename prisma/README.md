@@ -1,46 +1,142 @@
-# Prisma Run·Trace baseline
+# Prisma LIVE persistence
 
-`schema.prisma`는 v0.6·v0.7의 선택형 Live persistence 계약이다. 활성 모델은
-`RecommendationRun`과 `AgentTrace`뿐이다. 자격 증명 없는 기본 Demo는 memory
-repository를 사용하며 Prisma client를 import하거나 DB 환경 변수를 검사하지
-않아야 한다.
+The credential-free Demo uses memory repositories and must not load Prisma.
+Prisma is created only after a selected LIVE capability has passed environment
+validation.
 
-## 저장 경계
+## Migration order
 
-- Run ID는 application이 발급한 `run_<UUID>` 문자열이다.
-- Trace ID는 application이 발급한 `trace_<UUID>` 문자열이다.
-- `requestSnapshot`은 구조화되고 정제된 CHOICE/search input만 저장한다.
-- 연속 실행에는 64차원 numeric query vector와 SHA-256 fingerprint를 쓴다.
-- `responseSnapshot`에는 공개 Trace를 포함하지 않는다.
-- 승인과 교체의 동시 갱신은 `revision` compare-and-set repository 계약으로
-  처리한다.
-- Trace는 append-only이며 repository가 Run별 `sequence`를 할당한다.
-- fallback reason과 error code는 TypeScript allowlist를 통과한 값만 저장한다.
+1. `20260731090000_v07_run_trace_baseline` creates only anonymous
+   `RecommendationRun` and append-only `AgentTrace` storage.
+2. `20260731160000_v08_live_catalog_vector` additively introduces the internal
+   Trace sequence counter, normalized catalog/provider tables, versioned search
+   documents, `vector(1536)` embeddings, and the cosine HNSW index.
 
-사용자 relation, 자연어 원문, token, matched terms, prompt, secret,
-engagement, catalog 데이터는 저장하지 않는다.
+Never edit or squash the accepted v0.7 migration. On an authorized Node-based
+operator machine, supply rotated `DATABASE_URL` and `DIRECT_URL` values through
+the ignored `.env.local`:
 
-## 개발 규칙
+```powershell
+npm.cmd run db:validate
+npm.cmd run db:generate
+npm.cmd run db:migrate:deploy
+```
 
-1. Prisma Run 또는 Trace store를 명시적으로 선택한 경우에만
-   `DATABASE_URL`과 `DIRECT_URL`을 개인 secret 저장소에서 제공한다.
-2. migration 파일에는 connection string이나 자격 증명을 넣지 않는다.
-3. 이 저장소에서 외부 DB에 migration을 적용하지 않는다.
-4. 기본 Demo composition에서 `@prisma/client`를 import하지 않는다.
+`db:validate` uses a validation-only loopback URL and does not connect to a
+database. `migrate deploy` requires both database URLs and is the command that
+changes the selected database;
+review its target before running it. The v0.8 migration enables pgvector in the
+`extensions` schema. If an existing database installed `vector` in another
+schema, align the extension location before deployment rather than editing the
+accepted migration after it has run. The unapplied v0.8 SQL is wrapped in one
+PostgreSQL transaction so an intermediate DDL or permission failure rolls back.
 
-## 자격 증명 없는 schema 검증
+No migration or repository stores User, Profile, Auth, Engagement, source user
+text, prompts, raw tokens, matched terms, API responses, or credentials.
 
-`npm run db:validate`는 `scripts/prisma-validate.mjs`를 통해 validation 전용
-loopback URL을 Prisma CLI 자식 프로세스에만 주입한다. `prisma validate`는
-PostgreSQL에 연결하지 않으며, loopback port 1을 사용하므로 외부 DB를
-가리키지 않는다. 이 값은 application process나 `.env.local`에 저장되지
-않는다.
+## Generated clients and Worker factory
 
-실제 application에서 `runStore=prisma` 또는 `traceStore=prisma`를 선택하면
-`validateSelectedMvpAdapters`가 호출자가 제공한 진짜 `DATABASE_URL`과
-`DIRECT_URL`을 계속 요구한다. validation 전용 URL은 runtime adapter 설정의
-대체값이 아니다.
+The schema uses two Prisma 6.19 `prisma-client` generators with
+`engineType = "client"`:
 
-ERD는 [`docs/ERD-v0.7-baseline.md`](../docs/ERD-v0.7-baseline.md)를 참조한다.
-`sql/pgvector.sql`은 보류된 구 확장 자료이며 이 baseline migration에 포함하지
-않는다.
+- `src/generated/prisma-workerd/client` uses the Workerd WASM query compiler;
+- `src/generated/prisma-node/client` is for authorized Node batch jobs.
+
+Both generated directories are ignored because they contain machine-specific
+generator metadata and generated WASM. A clean clone must generate them before
+typecheck or build:
+
+```powershell
+npm.cmd ci
+npm.cmd run db:generate
+npm.cmd run typecheck
+```
+
+Composition should dynamically import the factory only after a Prisma-backed
+capability and its connection string have been validated. The factory itself
+uses literal imports of the generated Workerd client and `PrismaPg`, reads no
+environment variables, and creates no global cache:
+
+```ts
+const { createPrismaLiveAdapters } = await import(
+  "../adapters/prisma/factory"
+);
+const prisma = createPrismaLiveAdapters(validatedDatabaseUrl);
+```
+
+The caller owns the returned lifecycle and must call `disconnect()` when the
+composition/request lifecycle ends. The bundle also exposes `runs`, `traces`,
+`catalog`, and `embeddings`. A sanitized `RUNNING` row is written before
+catalog, search, or model work.
+`execution_mode`, `input_fingerprint`, and `query_vector` use SQL NULL until
+a real continuation exists; no placeholder vector or fingerprint is written.
+Awaiting/completed rows require all materialized fields, while failed rows
+store only the allowlisted error state and completion time. Run CAS and each
+Trace batch commit in the same transaction, including sequence allocation.
+
+## Catalog ingestion and embeddings
+
+TMDB is a batch ingestion source, not a request-time catalog adapter. Runtime
+recommendations read `PrismaCatalogRepository`; they never call TMDB directly.
+The explicit entry point is:
+
+```ts
+runTmdbCatalogIngestion({
+  credential: { kind: "bearer", value: tmdbCredential },
+  fetchImpl: globalThis.fetch,
+  writer: prisma.catalog,
+  pages: 1,
+});
+```
+
+`tmdbCredential` is supplied by the caller and is never logged or returned.
+Normalization keeps only the six public providers, uses SEARCH or HOME links
+when TMDB cannot prove a provider-native DIRECT URL, rejects items without a
+positive runtime/year or allowed Korean provider, and maps an absent or
+unrecognized Korean certification to `UNKNOWN`. Upsert is idempotent by
+TMDB/media identity and content hash. Raw TMDB responses are discarded.
+
+After catalog ingestion, an injected embedding generator can fill pending
+search documents:
+
+```ts
+runPendingCatalogEmbeddings({
+  repository: prisma.embeddings,
+  generator: openAiEmbeddingClient,
+  model: "text-embedding-3-small",
+  batchSize: 25,
+});
+```
+
+The repository enforces exactly 1536 finite numbers before writing a vector.
+The exported runners read no environment themselves. The package-level Node
+entrypoints load ignored `.env.local`, validate only required names, log only
+aggregate counts, and always disconnect the Node Prisma client.
+
+## Parameterized SQL
+
+pgvector is an unsupported Prisma scalar, so vector write/search statements are
+constant SQL with separately bound values. Vector arrays are validated, then
+serialized to pgvector's numeric literal and bound to `$n::extensions.vector`.
+Candidate IDs are bound as `text[]`, model and dimensions are bound scalars,
+and limits are range-checked integers. Never concatenate request text, IDs,
+model names, vector values, or limits into SQL.
+
+`$executeRawUnsafe`/`$queryRawUnsafe` appear only because Prisma cannot express
+the pgvector scalar through generated CRUD. The SQL string is a module
+constant; every runtime value is still a driver parameter.
+
+## Local and Worker limitations
+
+The LIVE factory uses the generated `runtime = "workerd"` client, Prisma's
+JavaScript query compiler (`engineType = "client"`), and `PrismaPg`. The
+project already enables Cloudflare `nodejs_compat`, which `pg` needs for its
+Node-compatible TCP APIs. The selected database endpoint must still be
+reachable from the Worker and its connection/pooling limits must be reviewed;
+client generation alone does not make an arbitrary private PostgreSQL endpoint
+reachable.
+
+Node migration and ingestion processes may import the separately generated
+`src/generated/prisma-node/client`. TMDB ingestion and catalog embedding remain
+operator/batch jobs and must not run inside page/API requests. The Demo path
+must not import the factory module eagerly or initialize a database adapter.

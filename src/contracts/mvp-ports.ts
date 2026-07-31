@@ -17,6 +17,7 @@ export interface RecommendationSearchAdapter {
   search(
     invocation: RecommendationSearchInvocation,
     candidates: CatalogContent[],
+    signal?: AbortSignal,
   ): Promise<RecommendationSearchOutput>;
 }
 
@@ -24,6 +25,7 @@ export interface RecommendationSelectorAdapter {
   select(
     items: RecommendationItem[],
     limit: number,
+    signal?: AbortSignal,
   ): Promise<SelectorOutput>;
 }
 
@@ -43,6 +45,23 @@ export interface AgentTraceRepository {
     event: NewTraceEvent,
   ): Promise<StoredTraceEvent>;
   listStored(runId: string): Promise<StoredTraceEvent[]>;
+}
+
+/**
+ * Atomic state/Trace boundary. Production adapters must commit the Run CAS and
+ * its complete Trace batch in one transaction (or not commit either).
+ */
+export interface RecommendationPersistenceUnitOfWork {
+  createRunWithTraceEvents(
+    run: StoredRecommendationRun,
+    events: readonly NewTraceEvent[],
+  ): Promise<void>;
+  updateRunWithTraceEvents(
+    runId: string,
+    expectedRevision: number,
+    patch: StoredRecommendationRunPatch,
+    events: readonly NewTraceEvent[],
+  ): Promise<RunUpdateResult>;
 }
 
 export interface DemoResettable {

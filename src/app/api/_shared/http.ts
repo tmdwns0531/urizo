@@ -22,6 +22,12 @@ export class ApiError extends Error {
   }
 }
 
+export interface ReadJsonObjectOptions {
+  maximumBytes?: number;
+}
+
+const DEFAULT_JSON_OBJECT_MAX_BYTES = 16_384;
+
 export function badRequest(message: string): ApiError {
   return new ApiError(message, 400, ERROR_CODES.badRequest);
 }
@@ -57,11 +63,52 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function readJsonObject(
   request: Request,
+  options: ReadJsonObjectOptions = {},
 ): Promise<Record<string, unknown>> {
+  const maximumBytes = options.maximumBytes ?? DEFAULT_JSON_OBJECT_MAX_BYTES;
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1) {
+    throw new RangeError("maximumBytes must be a positive safe integer.");
+  }
+
   let raw: string;
   try {
-    raw = await request.text();
-  } catch {
+    const contentLength = request.headers.get("content-length");
+    const declaredBytes =
+      contentLength === null ? Number.NaN : Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > maximumBytes) {
+      throw badRequest(
+        `요청 본문은 UTF-8 기준 ${maximumBytes}바이트를 넘을 수 없습니다.`,
+      );
+    }
+
+    if (!request.body) {
+      raw = "";
+    } else {
+      const reader = request.body.getReader();
+      const decoder = new TextDecoder();
+      let receivedBytes = 0;
+      const chunks: string[] = [];
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          receivedBytes += value.byteLength;
+          if (receivedBytes > maximumBytes) {
+            await reader.cancel().catch(() => undefined);
+            throw badRequest(
+              `요청 본문은 UTF-8 기준 ${maximumBytes}바이트를 넘을 수 없습니다.`,
+            );
+          }
+          chunks.push(decoder.decode(value, { stream: true }));
+        }
+        chunks.push(decoder.decode());
+        raw = chunks.join("");
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw badRequest("요청 본문을 읽을 수 없습니다.");
   }
 
