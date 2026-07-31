@@ -46,8 +46,8 @@ export default function HomePage() {
             </div>
             <div className="landing-proof" aria-label="실행 원칙">
               <span>✓ 로그인 없이 시작</span>
-              <span>✓ Demo는 키 없이 실행</span>
-              <span>✓ LIVE는 선택 기능만 연결</span>
+              <span>✓ 가입·결제 없이 바로 사용</span>
+              <span>✓ 내가 쓰는 OTT만 골라서</span>
             </div>
           </div>
 
@@ -57,7 +57,7 @@ export default function HomePage() {
                 <span className="demo-live-dot" />
                 <strong>지금 조건을 지키는 중</strong>
               </div>
-              <span>Preview</span>
+              <span>미리보기 예시</span>
             </div>
             <div className="landing-demo__prompt">
               <p>오늘은 이렇게 볼게요</p>
@@ -72,7 +72,7 @@ export default function HomePage() {
                 <small>TOP PICKS</small>
                 <h2>이 3편부터 볼까요?</h2>
               </div>
-              <span className="verified-badge">정책 확인 완료</span>
+              <span className="verified-badge">조건 확인 완료</span>
             </div>
             <div className="landing-poster-row">
               {previewTitles.map((item, index) => (
@@ -94,7 +94,7 @@ export default function HomePage() {
               <span aria-hidden="true">✓</span>
               <div>
                 <strong>조건과 안전 기준을 두 번 확인했어요</strong>
-                <small>필수 필터 → 점수 → 다양성 → 최종 정책 검사</small>
+                <small>조건 확인 → 순위 매기기 → 겹치지 않게 → 마지막 점검</small>
               </div>
             </div>
           </div>
@@ -112,8 +112,8 @@ export default function HomePage() {
           <p className="eyebrow">WHY OTT DAMOA</p>
           <h2>AI의 결과보다, 지켜야 할 과정을 먼저 설계했어요.</h2>
           <p>
-            추천 엔진이 무엇으로 바뀌어도 안전·예산·승인 규칙은 실행기
-            바깥에서 똑같이 작동합니다.
+            추천 방식이 어떻게 바뀌어도, 지켜드리기로 한 약속은 항상
+            똑같이 적용됩니다.
           </p>
         </div>
         <ol className="principle-grid">
@@ -126,7 +126,7 @@ export default function HomePage() {
           <li>
             <span>02</span>
             <div className="principle-icon principle-icon--teal">◇</div>
-            <h3>조건 완화는 승인 후</h3>
+            <h3>조건은 물어보고 바꿔요</h3>
             <p>결과가 부족해도 몰래 넓히지 않고 먼저 물어봐요.</p>
           </li>
           <li>
@@ -138,7 +138,7 @@ export default function HomePage() {
           <li>
             <span>04</span>
             <div className="principle-icon principle-icon--amber">↯</div>
-            <h3>예산 초과도 우아하게</h3>
+            <h3>AI가 멈춰도 추천은 계속</h3>
             <p>AI 호출이 멈춰도 같은 조건의 규칙 추천으로 이어가요.</p>
           </li>
         </ol>
