@@ -93,6 +93,26 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
   assert.equal(resolved.transientInput.maxRuntimeMinutes, null);
   assert.equal(resolved.sanitizedInput.naturalLanguage, undefined);
 
+  assert.throws(
+    () =>
+      request.resolveMvpRecommendationRequest(
+        { choice: {} },
+        { requireMeaningfulChoice: true },
+      ),
+    (error) =>
+      error instanceof request.MvpRequestValidationError &&
+      error.issues.some((issue) => issue.code === "POLICY"),
+    "public recommendation requests must not be fully neutral",
+  );
+  assert.deepEqual(
+    request.resolveMvpRecommendationRequest(
+      { choice: { moods: ["따뜻한"] } },
+      { requireMeaningfulChoice: true },
+    ).choice.moods,
+    ["따뜻한"],
+    "one meaningful condition is sufficient",
+  );
+
   for (const invalid of [
     { userId: "forbidden" },
     { scenario: "policy_block" },
@@ -341,7 +361,16 @@ test("active score renormalizes absent genre weight without UserContext", async 
     (0.8 * 0.15 + 0.5 * 0.29 + 0.7 * 0.15 + 0.5 * 0.1 + 0.7 * 0.05) /
     (1 - 0.26);
   assert.equal(item.scoreBreakdown.genre, 0);
+  assert.equal(item.matchPercent, null);
   assert.ok(Math.abs(item.score - expected) < 1e-12);
+
+  const [withMood] = scoring.scoreMvpSearchResults(
+    [{ content: content({ moodTags: ["따뜻한"] }), semanticScore: 0.8 }],
+    request.resolveMvpRecommendationRequest({
+      choice: { moods: ["따뜻한"] },
+    }).sanitizedInput,
+  );
+  assert.equal(typeof withMood.matchPercent, "number");
 });
 
 test("injected OpenAI and pgvector adapters validate dimensions and candidate allowlist", async () => {

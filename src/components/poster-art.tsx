@@ -27,7 +27,7 @@ export function PosterArt({
       className={`poster-art${priority ? " poster-art--hero" : ""}`}
       style={{ "--poster-tone": content.backdropColor } as CSSProperties}
       role="img"
-      aria-label={`${content.title} 데모 포스터`}
+      aria-label={`${content.title} 포스터`}
     >
       {content.posterUrl ? (
         <img

@@ -105,6 +105,7 @@ export class AnonymousRecommendationOrchestrator
   ): Promise<MvpRecommendationResponse> {
     const resolved = resolveMvpRecommendationRequest(request, {
       allowScenario: this.dependencies.appProfile === "demo",
+      requireMeaningfulChoice: true,
     });
     const runId = createId("run");
     const startedAt = new Date().toISOString();

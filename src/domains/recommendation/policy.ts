@@ -127,8 +127,8 @@ export class PolicyLayer {
       traceEvents.push(
         publicTrace(
           "fallback",
-          "안전한 규칙 추천으로 전환했어요",
-          "외부 호출을 더 진행하지 않고 같은 필수 조건의 고정 점수 규칙을 사용했습니다.",
+          "기본 추천으로 이어서 찾았어요",
+          "AI 추천을 더 진행하지 않고 같은 조건을 지키는 기본 추천으로 전환했어요.",
           {
             modelCalls: attempt.budgetSnapshot.modelCalls,
             toolCalls: attempt.budgetSnapshot.toolCalls,
@@ -144,28 +144,28 @@ export class PolicyLayer {
     traceEvents.unshift(
       publicTrace(
         "filter",
-        "필수 조건을 먼저 확인했어요",
-        "익명 연령, 국내 OTT, 선택 OTT, 시간, 제작 국가와 제외 장르를 코드로 검사했습니다.",
+        "고른 조건을 먼저 확인했어요",
+        "연령과 이용 가능한 OTT, 선택한 시간, 제작 국가와 제외 장르를 먼저 확인했어요.",
         { eligibleCount: execution.eligibleCount },
       ),
       publicTrace(
         "vector_search",
         "현재 요청과 가까운 작품을 찾았어요",
         invocation.kind === "initial" && invocation.input.hasNaturalLanguage
-          ? "자연어 원문은 저장하지 않고 vector로 변환해 후보를 찾았습니다."
-          : "정제된 CHOICE와 저장 vector를 사용해 후보를 찾았습니다.",
+          ? "적어주신 문장은 저장하지 않고 요청과 가까운 작품을 찾았어요."
+          : "고른 조건과 가까운 작품을 찾았어요.",
         { candidateCount: execution.ranked.length },
       ),
       publicTrace(
         "score",
-        "후보 점수를 계산했어요",
-        "의미, 분위기, 장르, 시간, 작품 품질, 동반자 적합도와 다양성을 계산했습니다.",
+        "어울리는 후보를 비교했어요",
+        "분위기, 장르, 시청 시간, 작품 평가, 함께 보는 사람과 후보 다양성을 비교했어요.",
         { candidateCount: execution.ranked.length },
       ),
       publicTrace(
         "select",
-        "최종 후보를 선택했어요",
-        "후보 allowlist 안에서 예산을 지키며 최종 작품을 선택했습니다.",
+        "최종 추천 작품을 골랐어요",
+        "조건을 통과한 후보 안에서 최종 추천 작품을 골랐어요.",
         {
           resultCount: execution.selected.length,
           modelCalls: execution.budgetSnapshot.modelCalls,
@@ -200,8 +200,8 @@ export class PolicyLayer {
       traceEvents.push(
         publicTrace(
           "policy_block",
-          "응답 직전에 안전하지 않은 후보를 제외했어요",
-          "선택 결과를 다시 검사해 필수 조건을 위반한 작품을 노출하지 않았습니다.",
+          "마지막 확인에서 맞지 않는 후보를 제외했어요",
+          "선택 결과를 한 번 더 확인해 조건을 벗어난 작품은 보여드리지 않았어요.",
           { blockedCount: blocked.length },
         ),
       );
@@ -241,7 +241,7 @@ export class PolicyLayer {
       traceEvents.push(
         publicTrace(
           "approval_request",
-          "조건을 바꾸기 전에 승인을 기다려요",
+          "조건을 바꾸기 전에 확인을 기다리고 있어요",
           proposal.question,
           {
             effectiveRuntimeMinutes: 30,
@@ -267,8 +267,8 @@ export class PolicyLayer {
     traceEvents.push(
       publicTrace(
         "complete",
-        "최종 정책 검사를 통과했어요",
-        notice ?? `안전 조건을 통과한 ${recommendations.length}편을 추천합니다.`,
+        "마지막 안전 확인을 마쳤어요",
+        notice ?? `안전 기준을 통과한 ${recommendations.length}편을 추천해요.`,
         {
           resultCount: recommendations.length,
           blockedCount: blocked.length,

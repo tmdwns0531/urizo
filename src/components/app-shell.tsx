@@ -5,8 +5,9 @@ import type { ReactNode } from "react";
 
 type AppShellProps = {
   children: ReactNode;
-  active?: "choice";
+  active?: "choice" | "results";
   minimal?: boolean;
+  confirmChoiceReset?: boolean;
 };
 
 export function BrandMark({ inverse = false }: { inverse?: boolean }) {
@@ -27,6 +28,7 @@ export function AppShell({
   children,
   active,
   minimal = false,
+  confirmChoiceReset = false,
 }: AppShellProps) {
   return (
     <div className="app-frame">
@@ -55,6 +57,19 @@ export function AppShell({
                   href="/choice"
                   className="text-link"
                   onNavigate={(event) => {
+                    const hasDraft = document.querySelector(
+                      '[data-choice-dirty="true"]',
+                    );
+                    if (
+                      confirmChoiceReset &&
+                      hasDraft &&
+                      !window.confirm(
+                        "입력한 조건이 초기화됩니다. 새 추천을 시작할까요?",
+                      )
+                    ) {
+                      event.preventDefault();
+                      return;
+                    }
                     event.preventDefault();
                     window.location.assign("/choice");
                   }}
@@ -75,13 +90,21 @@ export function AppShell({
 
       {!minimal ? (
         <nav className="mobile-nav" aria-label="모바일 주요 메뉴">
-          <Link
-            href="/choice"
-            className={active === "choice" ? "is-active" : undefined}
-          >
-            <span aria-hidden="true">✦</span>
-            추천받기
-          </Link>
+          {active === "choice" ? (
+            <button
+              type="submit"
+              form="choice-form"
+              className="is-active"
+            >
+              <span aria-hidden="true">✦</span>
+              5편 추천받기
+            </button>
+          ) : (
+            <Link href="/choice">
+              <span aria-hidden="true">✦</span>
+              새 추천 받기
+            </Link>
+          )}
         </nav>
       ) : null}
     </div>

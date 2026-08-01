@@ -52,7 +52,9 @@ export function ContentCard({
         </div>
         <div className="top-pick-card__content">
           <div className="top-pick-card__eyebrow">
-            <span className="match-badge">취향 일치 {item.matchPercent}%</span>
+            {item.matchPercent !== null ? (
+              <span className="match-badge">취향 일치 {item.matchPercent}%</span>
+            ) : null}
             <span>오늘의 첫 번째 선택</span>
           </div>
           <h2>{content.title}</h2>
@@ -128,7 +130,9 @@ export function ContentCard({
       <div className="content-card__poster">
         <span className="card-rank">{rank}</span>
         <PosterArt content={content} />
-        <span className="card-match">{item.matchPercent}% match</span>
+        {item.matchPercent !== null ? (
+          <span className="card-match">취향 일치 {item.matchPercent}%</span>
+        ) : null}
       </div>
       <div className="content-card__body">
         <div className="content-card__provider">

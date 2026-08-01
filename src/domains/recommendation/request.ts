@@ -78,6 +78,8 @@ export interface ResolveMvpRecommendationRequestOptions {
   profile?: MvpRequestProfile;
   /** Compatibility alias for HTTP composition: false is the safe default. */
   allowScenario?: boolean;
+  /** Reject requests that contain only neutral/default CHOICE values. */
+  requireMeaningfulChoice?: boolean;
 }
 
 const REQUEST_KEYS = ["choice"] as const;
@@ -202,7 +204,10 @@ const sameSet = (left: readonly string[], right: readonly string[]): boolean => 
   return sortedLeft.every((value, index) => value === sortedRight[index]);
 };
 
-function parseResolvedChoice(value: unknown): ResolvedMvpRecommendationChoice {
+function parseResolvedChoice(
+  value: unknown,
+  requireMeaningfulChoice: boolean,
+): ResolvedMvpRecommendationChoice {
   if (value === undefined) {
     value = {};
   }
@@ -344,6 +349,24 @@ function parseResolvedChoice(value: unknown): ResolvedMvpRecommendationChoice {
     }
   }
 
+  if (
+    requireMeaningfulChoice &&
+    selectedProviders.length === 0 &&
+    normalizedCompanions[0] === "ANY" &&
+    moods.length === 0 &&
+    desiredGenres.length === 0 &&
+    companionAvoidGenres.length === 0 &&
+    maxRuntimeMinutes === null &&
+    originPreference === "ANY" &&
+    naturalLanguage.trim().length === 0
+  ) {
+    fail(
+      "request.choice",
+      "POLICY",
+      "추천 조건을 하나 이상 선택해 주세요.",
+    );
+  }
+
   return {
     selectedProviders:
       selectedProviders.length === 0
@@ -383,7 +406,10 @@ export function resolveMvpRecommendationRequest(
     "request",
   );
 
-  const choice = parseResolvedChoice(value.choice);
+  const choice = parseResolvedChoice(
+    value.choice,
+    options.requireMeaningfulChoice ?? false,
+  );
   const scenario =
     profile === "demo"
       ? value.scenario === undefined

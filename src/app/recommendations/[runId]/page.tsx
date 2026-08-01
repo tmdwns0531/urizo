@@ -14,7 +14,7 @@ export default async function RecommendationPage({
   const { runId } = await params;
 
   return (
-    <AppShell active="choice">
+    <AppShell active="results">
       <div className="page-shell">
         <RecommendationView runId={runId} />
       </div>

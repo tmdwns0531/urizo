@@ -9,6 +9,7 @@ import type {
   MvpRecommendationResponse as RecommendationResponse,
 } from "@/contracts/mvp-recommendation";
 import { ContentCard } from "./content-card";
+import { RecommendationTimeline } from "./recommendation-timeline";
 
 type RecommendationViewProps = {
   runId: string;
@@ -94,53 +95,6 @@ export function ReplacementFeedbackNotice({
   );
 }
 
-function Timeline({ response }: { response: RecommendationResponse }) {
-  return (
-    <details className="trace-panel">
-      <summary>
-        <span className="trace-panel__icon" aria-hidden="true">
-          ◇
-        </span>
-        <span>
-          <strong>어떻게 골랐는지 모두 보기</strong>
-          <small>{response.trace.length}개의 공개 가능한 실행 기록</small>
-        </span>
-        <i aria-hidden="true">⌄</i>
-      </summary>
-      <ol className="trace-list">
-        {response.trace.map((event) => (
-          <li className={`trace-event trace-event--${event.action}`} key={event.id}>
-            <span aria-hidden="true">
-              {event.action === "policy_block"
-                ? "◇"
-                : event.action === "fallback"
-                  ? "↯"
-                  : event.action === "approval_request"
-                    ? "?"
-                    : "✓"}
-            </span>
-            <div>
-              <strong>{event.title}</strong>
-              <p>{event.description}</p>
-              {event.metrics ? (
-                <small>
-                  {Object.entries(event.metrics)
-                    .map(([key, value]) => `${key}: ${String(value)}`)
-                    .join(" · ")}
-                </small>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
-      <div className="trace-panel__foot">
-        <span>추천 실행 상세</span>
-        <code>필터 · 검색 · 선택 · 정책 · Trace</code>
-      </div>
-    </details>
-  );
-}
-
 function ApprovalView({
   response,
   onDecision,
@@ -167,13 +121,15 @@ function ApprovalView({
           </p>
           <div className="approval-change">
             <span>
-              현재 <strong>30분</strong>
+              현재 <strong>{response.proposal.currentMaxMinutes}분</strong>
             </span>
             <i aria-hidden="true">→</i>
             <span>
-              제안 <strong>45분</strong>
+              제안 <strong>{response.proposal.proposedMaxMinutes}분</strong>
             </span>
-            <small>후보 {response.proposal.currentCandidateCount}편 → 5편 예상</small>
+            <small>
+              현재 후보 {response.proposal.currentCandidateCount}편에서 더 찾아봐요
+            </small>
           </div>
           <div className="approval-actions">
             <button
@@ -182,7 +138,7 @@ function ApprovalView({
               disabled={deciding !== null}
             >
               {deciding === "approve"
-                ? "45분까지 다시 찾는 중…"
+                ? `${response.proposal.proposedMaxMinutes}분까지 다시 찾는 중…`
                 : response.proposal.approveLabel}
             </button>
             <button
@@ -191,7 +147,7 @@ function ApprovalView({
               disabled={deciding !== null}
             >
               {deciding === "reject"
-                ? "30분 결과를 정리하는 중…"
+                ? `${response.proposal.currentMaxMinutes}분 결과를 정리하는 중…`
                 : response.proposal.rejectLabel}
             </button>
           </div>
@@ -207,7 +163,10 @@ function ApprovalView({
         <div className="result-section-heading">
           <div>
             <p className="eyebrow">CURRENT MATCHES</p>
-            <h2>30분 조건에 맞는 {response.partialRecommendations.length}편</h2>
+            <h2>
+              {response.proposal.currentMaxMinutes}분 조건에 맞는{" "}
+              {response.partialRecommendations.length}편
+            </h2>
           </div>
           <span className="status-chip">조건 유지 중</span>
         </div>
@@ -221,7 +180,7 @@ function ApprovalView({
           ))}
         </div>
       </section>
-      <Timeline response={response} />
+      <RecommendationTimeline response={response} />
     </>
   );
 }
@@ -247,14 +206,14 @@ export function CompletedView({
         <div>
           <p className="eyebrow">YOUR PICKS</p>
           <h1>
-            오늘은 이 {response.recommendations.length}편이면 충분해요.
+            조건에 맞는 {response.recommendations.length}편을 찾았어요.
           </h1>
-          <p>선택한 조건을 끝까지 지키고, 마지막 안전 검사까지 마쳤어요.</p>
+          <p>선택한 조건을 끝까지 지키고, 마지막 안전 확인까지 마쳤어요.</p>
         </div>
         <div className="results-heading__actions">
           <span className="status-chip status-chip--safe">
             <span aria-hidden="true">◇</span>
-            정책 확인 완료
+            조건·안전 확인 완료
           </span>
           <Link href="/choice" className="button button--ghost">
             조건 바꾸기
@@ -270,8 +229,8 @@ export function CompletedView({
           <div>
             <strong>빠른 규칙 추천으로 전환했어요.</strong>
             <p>
-              추천 도구 사용 한도에 도달해도 같은 필터와 안전 기준은 그대로
-              지켰습니다.
+              AI 추천이 잠시 멈췄어도 같은 조건과 안전 기준은 그대로
+              지켰어요.
             </p>
           </div>
         </aside>
@@ -309,13 +268,16 @@ export function CompletedView({
             replacing={replacingId === response.topPick.content.id}
             replacementPending={replacingId !== null}
           />
-          <Timeline response={response} />
+          <RecommendationTimeline response={response} />
         </div>
       ) : (
         <div className="empty-state">
           <span aria-hidden="true">◇</span>
           <h2>조건에 맞는 안전한 작품이 없어요.</h2>
-          <p>조건을 자동으로 바꾸지 않았어요. CHOICE에서 다시 골라 주세요.</p>
+          <p>
+            조건을 자동으로 바꾸지 않았어요. 조건 선택 화면에서 다시 골라
+            주세요.
+          </p>
           <Link href="/choice" className="button button--primary">
             조건 다시 고르기
           </Link>
@@ -327,7 +289,7 @@ export function CompletedView({
           <div className="result-section-heading">
             <div>
               <p className="eyebrow">ALSO FOR YOU</p>
-              <h2>함께 비교해 볼 후보</h2>
+              <h2>함께 비교해 볼 작품</h2>
             </div>
             <span>{alternatives.length}편</span>
           </div>
@@ -431,6 +393,8 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
   }, [runId]);
 
   async function decide(decision: ApprovalDecision) {
+    const proposal =
+      response?.status === "awaiting_approval" ? response.proposal : null;
     setDeciding(decision);
     setActionError("");
     try {
@@ -455,8 +419,12 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
       setResponse(result);
       setAnnouncement(
         decision === "approve"
-          ? "45분까지 넓혀 추천을 다시 만들었어요."
-          : "30분 조건을 유지한 결과를 보여드려요.",
+          ? proposal
+            ? `${proposal.proposedMaxMinutes}분까지 넓혀 추천을 다시 만들었어요.`
+            : "시청 시간 조건을 넓혀 추천을 다시 만들었어요."
+          : proposal
+            ? `${proposal.currentMaxMinutes}분 조건을 유지한 결과를 보여드려요.`
+            : "기존 시청 시간 조건을 유지한 결과를 보여드려요.",
       );
     } catch (decisionError) {
       setActionError(
@@ -545,12 +513,12 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
         <span className="result-loading__mark" aria-hidden="true">
           D
         </span>
-        <p className="eyebrow">RECOMMENDATION RUN</p>
+        <p className="eyebrow">추천 준비 중</p>
         <h1>선택한 조건을 차례로 확인하고 있어요.</h1>
         <ol>
-          <li className="is-active">필수 조건 확인</li>
-          <li>후보 점수 계산</li>
-          <li>마지막 정책 검사</li>
+          <li>고른 조건 확인</li>
+          <li>어울리는 후보 비교</li>
+          <li>마지막 안전 확인</li>
         </ol>
       </div>
     );

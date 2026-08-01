@@ -69,7 +69,7 @@ test("replacement feedback states render through a visible notice", () => {
   );
   const noticeBody = source.slice(
     source.indexOf("export function ReplacementFeedbackNotice"),
-    source.indexOf("function Timeline"),
+    source.indexOf("function ApprovalView"),
   );
 
   for (const status of ["pending", "success", "exhausted", "error"]) {
@@ -100,7 +100,7 @@ test("five recommendation IDs keep a five-card completed layout", () => {
   assert.equal(1 + alternativeIds.length, ids.length);
   assert.match(
     completedBody,
-    /오늘은 이 \{response\.recommendations\.length\}편이면 충분해요\./,
+    /조건에 맞는 \{response\.recommendations\.length\}편을 찾았어요\./,
   );
   assert.match(
     completedBody,
