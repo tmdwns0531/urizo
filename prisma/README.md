@@ -11,8 +11,14 @@ validation.
 2. `20260731160000_v08_live_catalog_vector` additively introduces the internal
    Trace sequence counter, normalized catalog/provider tables, versioned search
    documents, `vector(1536)` embeddings, and the cosine HNSW index.
+3. `20260802090000_v09_bounded_agent_multiturn` replaces the Run lifecycle
+   CHECK so a pre-search FAMILY clarification can remain unmaterialized while a
+   runtime-relaxation approval remains materialized.
+4. `20260803062000_v09_lifecycle_shape_atomic_hardening` atomically
+   re-establishes that CHECK and rejects malformed JSON shapes whose predicate
+   would otherwise evaluate to SQL null.
 
-Never edit or squash the accepted v0.7 migration. On an authorized Node-based
+Never edit or squash an existing migration. On an authorized Node-based
 operator machine, supply rotated `DATABASE_URL` and `DIRECT_URL` values through
 the ignored `.env.local`:
 
@@ -30,6 +36,11 @@ review its target before running it. The v0.8 migration enables pgvector in the
 schema, align the extension location before deployment rather than editing the
 accepted migration after it has run. The unapplied v0.8 SQL is wrapped in one
 PostgreSQL transaction so an intermediate DDL or permission failure rolls back.
+The immutable v0.9 multiturn migration drops and adds the lifecycle CHECK
+without an explicit transaction. Its additive hardening migration performs the
+canonical replacement inside one transaction, but cannot make an earlier v0.9
+failure atomic retroactively. Review the detailed
+[atomicity finding](../docs/V09-MIGRATION-ATOMICITY-REVIEW.md) before deployment.
 
 No migration or repository stores User, Profile, Auth, Engagement, source user
 text, prompts, raw tokens, matched terms, API responses, or credentials.
@@ -70,9 +81,11 @@ composition/request lifecycle ends. The bundle also exposes `runs`, `traces`,
 catalog, search, or model work.
 `execution_mode`, `input_fingerprint`, and `query_vector` use SQL NULL until
 a real continuation exists; no placeholder vector or fingerprint is written.
-Awaiting/completed rows require all materialized fields, while failed rows
-store only the allowlisted error state and completion time. Run CAS and each
-Trace batch commit in the same transaction, including sequence allocation.
+`FAMILY_COMPOSITION` awaiting rows are pre-search and require SQL NULL mode,
+fingerprint, and vector. `RUNTIME_RELAXATION` awaiting rows and completed rows
+require all three materialized fields. Failed rows store only the allowlisted
+error state and completion time. Run CAS and each Trace batch commit in the same
+transaction, including sequence allocation.
 
 ## Catalog ingestion and embeddings
 

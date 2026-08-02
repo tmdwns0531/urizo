@@ -118,7 +118,10 @@ runtime과 기존 vector로 서버가 새 fingerprint를 계산한 뒤 continuat
 ## Persistence
 
 v0.7 baseline migration은 그대로 유지하고, v0.8 migration에서 catalog/vector 추가와
-Run staging nullability·lifecycle CHECK를 비파괴적으로 적용한다.
+Run staging nullability·lifecycle CHECK를 비파괴적으로 적용한다. v0.9 multiturn
+migration은 FAMILY/RUNTIME 승인 shape으로 CHECK를 교체하며, 후속 atomic-hardening
+migration이 이를 명시적 transaction 안에서 원자적으로 재정립하고 JSON predicate를
+fail closed한다. 후속 migration은 원본 v0.9 실패 구간을 소급 원자화하지 않는다.
 활성 모델은 다음 여섯 개다.
 
 - `RecommendationRun`, `AgentTrace`
