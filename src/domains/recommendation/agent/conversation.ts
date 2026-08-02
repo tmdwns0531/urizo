@@ -48,12 +48,14 @@ export function createFamilyClarification(
   const text = input.naturalLanguage.trim();
   const withChildren = input.companions.includes("WITH_CHILDREN");
   const withFamily = input.companions.includes("FAMILY");
+  const needsChildRating =
+    withChildren && input.childAgeRatingLimit === null;
+  const needsNaturalFamilyComposition =
+    withFamily &&
+    input.hasNaturalLanguage &&
+    !hasNaturalAdultFamilySignal(text);
 
-  if (
-    input.childAgeRatingLimit !== null ||
-    (!withChildren && !withFamily) ||
-    (withFamily && hasNaturalAdultFamilySignal(text))
-  ) return null;
+  if (!needsChildRating && !needsNaturalFamilyComposition) return null;
 
   return {
     kind: "FAMILY_COMPOSITION",

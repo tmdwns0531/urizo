@@ -324,7 +324,7 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
   );
 });
 
-test("family clarification follows the resolved structured companion", async () => {
+test("family clarification distinguishes structured adults from unresolved families", async () => {
   const request = await loadModule("src/domains/recommendation/request.ts");
   const conversation = await loadModule(
     "src/domains/recommendation/agent/conversation.ts",
@@ -333,8 +333,13 @@ test("family clarification follows the resolved structured companion", async () 
   const structuredFamily = request.resolveMvpRecommendationRequest({
     choice: { companions: ["FAMILY"] },
   }).transientInput;
+  assert.equal(conversation.createFamilyClarification(structuredFamily), null);
+
+  const structuredChildren = request.resolveMvpRecommendationRequest({
+    choice: { companions: ["WITH_CHILDREN"] },
+  }).transientInput;
   assert.equal(
-    conversation.createFamilyClarification(structuredFamily)?.kind,
+    conversation.createFamilyClarification(structuredChildren)?.kind,
     "FAMILY_COMPOSITION",
   );
 

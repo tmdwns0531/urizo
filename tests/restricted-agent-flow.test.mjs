@@ -83,6 +83,54 @@ test("제한형 Agent는 모호한 조건에 한 번 질문하고 답변 후 sea
   }
 });
 
+test("구조화 CHOICE의 성인 가족은 확정된 FAMILY 조건으로 바로 검색한다", async () => {
+  const { createMvpComposition } = await load("src/composition/index.ts");
+  const composition = await createMvpComposition({ config: demoConfig });
+
+  try {
+    const completed = await composition.services.recommend({
+      choice: { companions: ["FAMILY"] },
+    });
+
+    assert.equal(completed.status, "completed");
+    assert.ok(completed.recommendations.length > 0);
+    const run = await composition.adapters.runs.get(completed.runId);
+    assert.equal(run.status, "COMPLETED");
+    assert.deepEqual(run.requestSnapshot.companions, ["FAMILY"]);
+    assert.equal(run.requestSnapshot.childAgeRatingLimit, null);
+    assert.equal(run.requestSnapshot.hasNaturalLanguage, false);
+    assert.equal(run.toolCallCount, 1);
+  } finally {
+    await composition.dispose();
+  }
+});
+
+test("canonical 결과 흐름은 저장되지 않은 자연어 없이도 가족 답변을 이어간다", async () => {
+  const { createMvpComposition } = await load("src/composition/index.ts");
+  const composition = await createMvpComposition({ config: demoConfig });
+
+  try {
+    const awaiting = await composition.services.recommend({
+      choice: { naturalLanguage: "가족과 따뜻한 작품을 보고 싶어" },
+    });
+    assert.equal(awaiting.status, "awaiting_approval");
+    assert.equal(awaiting.proposal.kind, "FAMILY_COMPOSITION");
+
+    const completed = await composition.services.decideApproval(
+      awaiting.runId,
+      "ADULTS_ONLY",
+    );
+    assert.equal(completed.status, "completed");
+    assert.ok(completed.recommendations.length > 0);
+    const run = await composition.adapters.runs.get(awaiting.runId);
+    assert.deepEqual(run.requestSnapshot.companions, ["FAMILY"]);
+    assert.equal(run.requestSnapshot.hasNaturalLanguage, false);
+    assert.equal(run.toolCallCount, 1);
+  } finally {
+    await composition.dispose();
+  }
+});
+
 test("가족 연령대 답변은 기존 관람등급 안전선으로 변환한다", async () => {
   const { clarificationAnswerRatingLimit } = await load(
     "src/domains/recommendation/agent/conversation.ts",

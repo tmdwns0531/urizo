@@ -243,6 +243,23 @@ test("approval copy does not promise a fixed result count", async () => {
   );
 });
 
+test("canonical result renders and submits every family clarification answer", async () => {
+  const source = await readSource("src/components/recommendation-view.tsx");
+  assert.ok(
+    source.includes("response.proposal.answers.map"),
+    "family clarification must render its answer list",
+  );
+  assert.ok(
+    source.includes("onClarification(answer.value)"),
+    "each family answer must remain actionable",
+  );
+  assert.match(
+    source,
+    /body:\s*JSON\.stringify\(\{\s*answer\s*\}\)/,
+    "canonical result must submit the clarification answer",
+  );
+});
+
 test("mobile recommendation action submits the active CHOICE form", async () => {
   const form = await readSource(
     "src/components/choice-stepper/choice-stepper.tsx",

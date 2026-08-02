@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   MvpApprovalDecision as ApprovalDecision,
   MvpAwaitingApprovalRecommendationResponse as AwaitingApprovalRecommendationResponse,
+  MvpClarificationAnswer as ClarificationAnswer,
   MvpCompletedRecommendationResponse as CompletedRecommendationResponse,
   MvpRecommendationResponse as RecommendationResponse,
 } from "@/contracts/mvp-recommendation";
@@ -101,12 +102,14 @@ export function ReplacementFeedbackNotice({
 function ApprovalView({
   response,
   onDecision,
+  onClarification,
   deciding,
   error,
 }: {
   response: AwaitingApprovalRecommendationResponse;
   onDecision: (decision: ApprovalDecision) => void;
-  deciding: ApprovalDecision | null;
+  onClarification: (answer: ClarificationAnswer) => void;
+  deciding: ApprovalDecision | ClarificationAnswer | null;
   error: string;
 }) {
   if (response.proposal.kind === "FAMILY_COMPOSITION") {
@@ -126,14 +129,28 @@ function ApprovalView({
             {response.proposal.question}
           </h1>
           <p className="mt-3 text-base leading-7 text-slate-300">
-            입력 문장은 저장하지 않으므로 한마디 추천 화면에서 답변을 이어가 주세요.
+            가족 구성을 선택하면 같은 조건으로 추천을 바로 이어갈게요.
           </p>
-          <Link
-            href="/prompt"
-            className="mt-6 inline-flex min-h-12 items-center rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.2)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-          >
-            한마디 추천으로 돌아가기
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3" aria-label="가족 구성 답변">
+            {response.proposal.answers.map((answer) => (
+              <button
+                type="button"
+                className="min-h-12 rounded-full border border-orange-400/35 bg-orange-500/10 px-5 text-sm font-black text-orange-200 transition hover:bg-orange-500/20 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400 disabled:opacity-50"
+                disabled={deciding !== null}
+                onClick={() => onClarification(answer.value)}
+                key={answer.value}
+              >
+                {deciding === answer.value
+                  ? "조건을 반영하는 중…"
+                  : answer.label}
+              </button>
+            ))}
+          </div>
+          {error ? (
+            <p className="mt-4 text-sm font-bold text-red-300" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
       </section>
     );
@@ -396,7 +413,9 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
-  const [deciding, setDeciding] = useState<ApprovalDecision | null>(null);
+  const [deciding, setDeciding] = useState<
+    ApprovalDecision | ClarificationAnswer | null
+  >(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [replacementFeedback, setReplacementFeedback] =
     useState<ReplacementFeedback | null>(null);
@@ -520,6 +539,52 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
     }
   }
 
+  async function clarify(answer: ClarificationAnswer) {
+    if (
+      response?.status !== "awaiting_approval" ||
+      response.proposal.kind !== "FAMILY_COMPOSITION"
+    ) {
+      return;
+    }
+    const answerLabel = response.proposal.answers.find(
+      (item) => item.value === answer,
+    )?.label;
+    setDeciding(answer);
+    setActionError("");
+    try {
+      const request = await fetch(
+        `/api/recommendations/${encodeURIComponent(runId)}/approval`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ answer }),
+        },
+      );
+      const result = (await request.json().catch(() => null)) as
+        | RecommendationResponse
+        | { error?: string }
+        | null;
+      if (!request.ok || !result || !("status" in result)) {
+        throw new Error(
+          (result && "error" in result && result.error) ||
+            "가족 구성 답변을 반영하지 못했어요.",
+        );
+      }
+      setResponse(result);
+      setAnnouncement(
+        `${answerLabel ?? "선택한 가족 구성"} 조건을 반영해 추천을 이어갔어요.`,
+      );
+    } catch (clarificationError) {
+      setActionError(
+        clarificationError instanceof Error
+          ? clarificationError.message
+          : "가족 구성 답변을 반영하지 못했어요.",
+      );
+    } finally {
+      setDeciding(null);
+    }
+  }
+
   async function replace(contentId: string) {
     if (replacementLock.current) return;
     replacementLock.current = true;
@@ -637,6 +702,7 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
         <ApprovalView
           response={response}
           onDecision={decide}
+          onClarification={clarify}
           deciding={deciding}
           error={actionError}
         />

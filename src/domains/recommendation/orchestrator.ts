@@ -543,10 +543,7 @@ export class AnonymousRecommendationOrchestrator
     naturalLanguage: string,
   ): Promise<MvpRecommendationResponse> {
     const transientText = naturalLanguage.trim();
-    if (
-      (run.requestSnapshot.hasNaturalLanguage && !transientText) ||
-      Array.from(transientText).length > NATURAL_LANGUAGE_MAX_CODE_POINTS
-    ) {
+    if (Array.from(transientText).length > NATURAL_LANGUAGE_MAX_CODE_POINTS) {
       throw new RecommendationRunStateError(
         "The transient clarification context is invalid.",
       );
