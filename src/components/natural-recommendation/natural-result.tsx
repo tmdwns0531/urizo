@@ -212,7 +212,10 @@ function CompletedNaturalResults({
         <aside className="result-notice result-notice--policy">
           <span aria-hidden="true">◇</span>
           <div>
-            <strong>연령 기준에 맞지 않는 후보를 제외했어요.</strong>
+            <strong>
+              아이 동반 시 선택한 최대 허용 관람등급을 포함한 모든 조건으로
+              다시 확인해, 맞지 않는 후보를 제외했어요.
+            </strong>
             <p>부적합 후보 {response.policyBlockedCount}편의 상세는 노출하지 않았어요.</p>
           </div>
         </aside>
@@ -395,7 +398,10 @@ export function NaturalRecommendationResult({
               : `조건에 맞는 ${displayedCount}편을 찾았어요.`}
           </h1>
           <p className="mt-3 text-base leading-7 text-slate-300">
-            직접 말한 조건과 시스템 기본값을 구분하고, 왜 골랐는지 함께 보여드려요.
+            {response.status === "awaiting_approval" &&
+            response.proposal.kind === "FAMILY_COMPOSITION"
+              ? "가족 구성을 확인한 뒤, 아이 동반이면 고른 관람 등급을 최대 허용 기준으로 결과 필터에 적용할게요."
+              : "아이 동반 시 고른 관람 등급을 최대 허용 기준으로 결과 필터에 적용했고, 직접 말한 조건과 기본값을 구분해 보여드려요."}
           </p>
         </div>
         <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm font-bold text-emerald-200">

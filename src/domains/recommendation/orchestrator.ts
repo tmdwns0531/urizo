@@ -93,8 +93,8 @@ export function formatRecommendationConditionSummary(
   const childRating =
     input.companions.includes("WITH_CHILDREN") && input.childAgeRatingLimit
       ? input.childAgeRatingLimit === "ALL"
-        ? "전체 관람가"
-        : `${input.childAgeRatingLimit}세 관람가까지`
+        ? "최대 허용 관람등급: 전체 관람가"
+        : `최대 허용 관람등급: ${input.childAgeRatingLimit}세 이상 관람가`
       : "";
   const mediaType =
     input.mediaType === "MOVIE"
@@ -571,7 +571,7 @@ export class AnonymousRecommendationOrchestrator
       clarifiedInput.childAgeRatingLimit === "ALL"
         ? "전체 관람가"
         : clarifiedInput.childAgeRatingLimit
-          ? `${clarifiedInput.childAgeRatingLimit}세 관람가까지`
+          ? `${clarifiedInput.childAgeRatingLimit}세 이상 관람가`
           : null;
     const transitionedAt = new Date().toISOString();
     const transition =
@@ -591,7 +591,7 @@ export class AnonymousRecommendationOrchestrator
             "approval_decision",
             "추가 답변을 조건에 반영했어요",
             childRatingLabel
-              ? `아이와 함께 보는 조건에 ${childRatingLabel} 기준을 적용하고 검색을 시작했어요.`
+              ? `아이와 함께 보는 조건에 최대 허용 관람등급(${childRatingLabel})을 적용하고 검색을 시작했어요.`
               : "성인 가족끼리 보는 조건으로 검색을 시작했어요.",
           ),
         ],

@@ -59,6 +59,19 @@ test("제한형 Agent는 모호한 조건에 한 번 질문하고 답변 후 sea
     assert.equal(completed.status, "completed");
     assert.equal(completed.recommendations.length, 5);
     assert.ok(completed.topPick);
+    assert.match(
+      completed.conditionSummary,
+      /최대 허용 관람등급: 12세 이상 관람가/,
+    );
+    assert.ok(
+      completed.trace.some(
+        (event) =>
+          event.action === "approval_decision" &&
+          event.description.includes(
+            "최대 허용 관람등급(12세 이상 관람가)",
+          ),
+      ),
+    );
     const afterAnswer = await composition.adapters.runs.get(awaiting.runId);
     assert.deepEqual(afterAnswer.requestSnapshot.companions, ["WITH_CHILDREN"]);
     assert.equal(afterAnswer.requestSnapshot.childAgeRatingLimit, "12");

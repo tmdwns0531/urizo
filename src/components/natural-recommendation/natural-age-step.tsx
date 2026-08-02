@@ -113,9 +113,9 @@ export function NaturalAgeStep({
                 })}
               </div>
               <p className="mt-4 rounded-xl bg-slate-950/55 px-4 py-3 text-sm leading-6 text-slate-300">
-                현재 추천 엔진은 정확한 연령 대신 아이 동반 공통 기준
-                (전체·7세·12세)을 더 안전하게 적용해요. 선택한 등급은 Choice
-                화면으로 이어집니다.
+                정확한 나이는 저장하지 않으며, 선택한 관람 등급을 최대 허용
+                기준으로 결과 필터에 직접 적용해요. 더 높은 등급과
+                18세·등급 미상 작품은 제외해요.
               </p>
             </fieldset>
           ) : null}

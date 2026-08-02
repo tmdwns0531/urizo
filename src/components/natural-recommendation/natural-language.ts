@@ -288,11 +288,12 @@ export function interpretNaturalRequest(
     genres,
   };
 
+  const selectedAgeLabel = findLabel(CHILD_AGE_OPTIONS, childAge);
   const whoLabel =
     who === "FAMILY" && familyType === "ADULTS"
       ? "성인 가족과"
       : who === "FAMILY" && familyType === "KIDS"
-        ? "아이와 함께 · 공통 안전 기준"
+        ? `아이와 함께 · 최대 허용 ${selectedAgeLabel ?? "관람등급 확인 필요"}`
         : WHO_LABELS[who];
   const durationLabel =
     runtimeMinutes !== null
@@ -398,12 +399,11 @@ export function interpretNaturalRequest(
   ];
 
   if (familyType === "KIDS") {
-    const selectedAgeLabel = findLabel(CHILD_AGE_OPTIONS, childAge);
     steps.push({
       title: "아이 동반 안전 기준",
       source: clarification ? "CLARIFIED" : "DISCLOSURE",
       description: selectedAgeLabel
-        ? `${selectedAgeLabel}를 최대 허용 관람등급으로 적용했어요. 정확한 나이는 저장하지 않아요.`
+        ? `${selectedAgeLabel}를 최대 허용 관람등급으로 결과 필터에 적용했어요. 정확한 나이는 저장하지 않아요.`
         : "검색 전에 최대 허용 관람등급을 확인하고, 아이의 정확한 나이는 저장하지 않아요.",
     });
   }

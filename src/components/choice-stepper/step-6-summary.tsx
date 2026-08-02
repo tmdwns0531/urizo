@@ -106,8 +106,9 @@ export function Step6Summary({ state, onEdit }: Step6SummaryProps) {
           {whoLabel}
           {state.who === "FAMILY" && state.familyType === "KIDS" ? (
             <small className="mt-2 block text-sm font-medium leading-6 text-slate-400">
-              선택한 관람 등급은 현재 결과 필터에 직접 반영되지 않으며, 아이
-              동반 공통 기준(전체·7세·12세)이 적용돼요.
+              최대 허용 관람등급: {ageLabel ?? "확인 필요"}. 이 기준을 결과
+              필터에 직접 적용하고, 더 높은 등급과 18세·등급 미상 작품은
+              제외해요.
             </small>
           ) : null}
         </SummaryRow>
