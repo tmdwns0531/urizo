@@ -41,14 +41,14 @@ export function Step1Who({
         >
           누구와 보나요?
         </h2>
-        <p className="text-sm leading-6 text-slate-400 sm:text-base">
+        <p className="text-base leading-7 text-slate-300">
           함께 보는 사람에 맞춰 작품을 골라드릴게요. 하나만 선택해 주세요.
         </p>
       </header>
 
       <fieldset>
         <legend className="sr-only">함께 보는 사람</legend>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
           {WHO_OPTIONS.map((option) => {
             const isSelected = who === option.value;
             return (
@@ -82,13 +82,13 @@ export function Step1Who({
                   <strong className="block text-lg text-slate-100">
                     {option.label}
                   </strong>
-                  <small className="mt-1 block text-sm leading-5 text-slate-500">
+                  <small className="mt-2 block text-sm leading-6 text-slate-400">
                     {option.hint}
                   </small>
                 </span>
                 <span
                   aria-hidden="true"
-                  className={`absolute right-4 top-4 grid size-5 place-items-center rounded-full border text-xs font-black ${
+                  className={`absolute right-4 top-4 grid size-6 place-items-center rounded-full border text-sm font-black ${
                     isSelected
                       ? "border-orange-400 bg-orange-500 text-white"
                       : "border-slate-700 text-transparent"
@@ -175,7 +175,7 @@ export function Step1Who({
               </div>
               <p
                 id="child-rating-policy"
-                className="mt-4 rounded-xl bg-slate-950/55 px-4 py-3 text-xs leading-5 text-slate-400"
+                className="mt-4 rounded-xl bg-slate-950/55 px-4 py-3 text-sm leading-6 text-slate-300"
               >
                 현재 추천 엔진은 선택한 관람 등급을 결과 필터에 직접 반영하지
                 않고, 아이 동반 공통 기준(전체·7세·12세)을 적용합니다.
@@ -190,7 +190,7 @@ export function Step1Who({
           className={`cursor-pointer rounded-full border px-6 py-3 text-sm font-bold transition-colors focus-within:outline-2 focus-within:outline-orange-400 ${
             who === NO_COMPANION_OPTION.value
               ? "border-slate-500 bg-slate-800 text-white"
-              : "border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300"
+              : "border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200"
           }`}
         >
           <input

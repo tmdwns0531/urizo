@@ -177,6 +177,11 @@ test("FAMILY requires its branch details and derives the exact API companion", a
     choice.buildRecommendationRequest(state, false).choice.companions,
     ["WITH_CHILDREN"],
   );
+  assert.equal(
+    choice.buildRecommendationRequest(state, false).choice
+      .childAgeRatingLimit,
+    "12",
+  );
 
   state = choice.choiceReducer(state, {
     type: "SET_FAMILY_TYPE",
@@ -387,6 +392,7 @@ test("the strict recommendation payload maps form state and omits unsupported ch
       companions: ["WITH_CHILDREN"],
       moods: ["긴장감 있는"],
       maxRuntimeMinutes: 120,
+      childAgeRatingLimit: "15",
       originPreference: "KR",
       desiredGenres: ["SF", "판타지", "공포", "스릴러"],
       explicitlyRequestedGenres: ["SF", "판타지", "공포", "스릴러"],

@@ -22,7 +22,7 @@ export function Step4Mood({ value, onChange }: Step4MoodProps) {
         >
           오늘 어떤 느낌의 작품이 끌리나요?
         </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400 sm:text-base">
+        <p className="mt-2 text-base leading-7 text-slate-300">
           지금 가장 원하는 느낌 하나를 골라주세요. 선택한 느낌을 추천 순위에
           반영할게요.
         </p>
@@ -30,7 +30,7 @@ export function Step4Mood({ value, onChange }: Step4MoodProps) {
 
       <fieldset aria-labelledby="choice-step-4-title">
         <legend className="sr-only">원하는 느낌 한 가지 선택</legend>
-        <div className="choice-stepper__mood-list flex flex-col gap-3">
+        <div className="choice-stepper__mood-list grid grid-cols-1 gap-3 lg:grid-cols-2">
           {MOOD_OPTIONS.map((option) => {
             const isSelected = value === option.value;
 
@@ -57,14 +57,14 @@ export function Step4Mood({ value, onChange }: Step4MoodProps) {
                   </strong>
                   <small
                     className={`mt-1 block text-sm ${
-                      isSelected ? "text-orange-200" : "text-slate-500"
+                      isSelected ? "text-orange-200" : "text-slate-400"
                     }`}
                   >
                     {option.hint}
                   </small>
                 </span>
                 <span
-                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[0.7rem] ${
+                  className={`grid size-6 shrink-0 place-items-center rounded-full border text-sm ${
                     isSelected
                       ? "border-[#ff7043] bg-[#ff7043] text-white"
                       : "border-slate-600 text-transparent"

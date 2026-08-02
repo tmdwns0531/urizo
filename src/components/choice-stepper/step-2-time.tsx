@@ -26,7 +26,7 @@ export function Step2Time({
         >
           지금 최대 얼마나 볼 수 있나요?
         </h2>
-        <p className="text-sm leading-6 text-slate-400 sm:text-base">
+        <p className="text-base leading-7 text-slate-300">
           지금 볼 수 있는 시간을 골라주세요. 영화는 한 편, 드라마는 한 회
           기준이에요.
         </p>
@@ -34,7 +34,7 @@ export function Step2Time({
 
       <fieldset>
         <legend className="sr-only">최대 시청 가능 시간</legend>
-        <div className="stepper-option-grid grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="stepper-option-grid grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
           {DURATION_OPTIONS.map((option) => {
             const isSelected = duration === option.value;
 
@@ -63,12 +63,12 @@ export function Step2Time({
                 >
                   {option.label}
                 </span>
-                <span className="mt-1 text-sm text-slate-500">
+                <span className="mt-2 text-sm leading-6 text-slate-400">
                   {option.hint}
                 </span>
                 <span
                   aria-hidden="true"
-                  className={`absolute right-4 top-4 flex size-5 items-center justify-center rounded-full border text-xs font-black ${
+                  className={`absolute right-4 top-4 flex size-6 items-center justify-center rounded-full border text-sm font-black ${
                     isSelected
                       ? "border-orange-400 bg-orange-500 text-white"
                       : "border-slate-700 text-transparent"

@@ -8,6 +8,8 @@ import type {
   MvpCompletedRecommendationResponse as CompletedRecommendationResponse,
   MvpRecommendationResponse as RecommendationResponse,
 } from "@/contracts/mvp-recommendation";
+import { RecommendationWaitingScreen } from "./advertising/recommendation-waiting-screen";
+import { SponsoredVideoAd } from "./advertising/sponsored-video-ad";
 import { ContentCard } from "./content-card";
 import { RecommendationTimeline } from "./recommendation-timeline";
 
@@ -85,6 +87,7 @@ export function ReplacementFeedbackNotice({
     <aside
       className="result-notice result-notice--neutral"
       data-replacement-state={feedback.status}
+      aria-live="polite"
     >
       <span aria-hidden="true">{icon}</span>
       <div>
@@ -106,34 +109,71 @@ function ApprovalView({
   deciding: ApprovalDecision | null;
   error: string;
 }) {
+  if (response.proposal.kind === "FAMILY_COMPOSITION") {
+    return (
+      <section
+        className="rounded-3xl border border-white/10 bg-[#171b21] p-6 shadow-[0_24px_70px_rgba(0,0,0,.24)] sm:p-8"
+        data-agent-chat="clarification"
+      >
+        <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-[#ff5430] to-[#ff7c42] text-lg font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.2)]" aria-hidden="true">
+          A
+        </div>
+        <div className="mt-5 max-w-3xl">
+          <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+            추가 질문
+          </p>
+          <h1 className="mt-2 text-balance text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+            {response.proposal.question}
+          </h1>
+          <p className="mt-3 text-base leading-7 text-slate-300">
+            입력 문장은 저장하지 않으므로 한마디 추천 화면에서 답변을 이어가 주세요.
+          </p>
+          <Link
+            href="/prompt"
+            className="mt-6 inline-flex min-h-12 items-center rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.2)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+          >
+            한마디 추천으로 돌아가기
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <>
-      <section className="approval-banner">
-        <div className="approval-banner__icon" aria-hidden="true">
+      <section className="rounded-3xl border border-white/10 bg-[#171b21] p-6 shadow-[0_24px_70px_rgba(0,0,0,.24)] sm:p-8">
+        <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-[#ff5430] to-[#ff7c42] text-xl font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.2)]" aria-hidden="true">
           ?
         </div>
-        <div className="approval-banner__copy">
-          <p className="eyebrow">APPROVAL REQUIRED</p>
-          <h1>{response.proposal.question}</h1>
-          <p>
+        <div className="mt-5 max-w-3xl">
+          <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+            APPROVAL REQUIRED
+          </p>
+          <h1 className="mt-2 text-balance text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+            {response.proposal.question}
+          </h1>
+          <p className="mt-3 text-base leading-7 text-slate-300">
             넓어지는 조건은 러닝타임뿐이에요. 구독 OTT·기분·연령 기준은
             그대로 유지합니다.
           </p>
-          <div className="approval-change">
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">
+            {response.conditionSummary}
+          </p>
+          <div className="mt-6 flex max-w-2xl flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm leading-6 text-slate-300">
             <span>
-              현재 <strong>{response.proposal.currentMaxMinutes}분</strong>
+              현재 <strong className="ml-1 text-lg text-white">{response.proposal.currentMaxMinutes}분</strong>
             </span>
-            <i aria-hidden="true">→</i>
+            <i className="not-italic text-orange-400" aria-hidden="true">→</i>
             <span>
-              제안 <strong>{response.proposal.proposedMaxMinutes}분</strong>
+              제안 <strong className="ml-1 text-lg text-orange-300">{response.proposal.proposedMaxMinutes}분</strong>
             </span>
-            <small>
+            <small className="w-full text-sm text-slate-400 sm:ml-auto sm:w-auto">
               현재 후보 {response.proposal.currentCandidateCount}편에서 더 찾아봐요
             </small>
           </div>
-          <div className="approval-actions">
+          <div className="mt-5 flex flex-wrap gap-3">
             <button
-              className="button button--primary"
+              className="min-h-12 rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.2)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:translate-y-0 disabled:opacity-50"
               onClick={() => onDecision("approve")}
               disabled={deciding !== null}
             >
@@ -142,7 +182,7 @@ function ApprovalView({
                 : response.proposal.approveLabel}
             </button>
             <button
-              className="button button--ghost"
+              className="min-h-12 rounded-full border border-slate-700 bg-white/5 px-6 text-sm font-black text-slate-200 transition hover:border-slate-500 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400 disabled:opacity-50"
               onClick={() => onDecision("reject")}
               disabled={deciding !== null}
             >
@@ -152,25 +192,29 @@ function ApprovalView({
             </button>
           </div>
           {error ? (
-            <p className="form-error approval-error" role="alert">
+            <p className="mt-4 text-sm font-bold text-red-300" role="alert">
               {error}
             </p>
           ) : null}
         </div>
       </section>
 
-      <section className="partial-results">
-        <div className="result-section-heading">
+      <section className="mt-10" aria-labelledby="partial-results-title">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">CURRENT MATCHES</p>
-            <h2>
+            <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+              CURRENT MATCHES
+            </p>
+            <h2 id="partial-results-title" className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
               {response.proposal.currentMaxMinutes}분 조건에 맞는{" "}
               {response.partialRecommendations.length}편
             </h2>
           </div>
-          <span className="status-chip">조건 유지 중</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-300">
+            조건 유지 중
+          </span>
         </div>
-        <div className="content-grid">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {response.partialRecommendations.map((item, index) => (
             <ContentCard
               item={item}
@@ -180,7 +224,9 @@ function ApprovalView({
           ))}
         </div>
       </section>
-      <RecommendationTimeline response={response} />
+      <div className="mt-7">
+        <RecommendationTimeline response={response} />
+      </div>
     </>
   );
 }
@@ -198,24 +244,31 @@ export function CompletedView({
 }) {
   const alternatives = response.recommendations.filter(
     (item) => item.content.id !== response.topPick?.content.id,
-  );
+  ).slice(0, 4);
 
   return (
     <>
-      <header className="results-heading">
-        <div>
-          <p className="eyebrow">YOUR PICKS</p>
-          <h1>
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="max-w-3xl">
+          <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+            YOUR PICKS
+          </p>
+          <h1 className="sr-only">
             조건에 맞는 {response.recommendations.length}편을 찾았어요.
           </h1>
-          <p>선택한 조건을 끝까지 지키고, 마지막 안전 확인까지 마쳤어요.</p>
+          <p className="mt-1 text-base leading-7 text-slate-300">
+            선택한 조건을 끝까지 지키고, 마지막 안전 확인까지 마쳤어요.
+          </p>
         </div>
-        <div className="results-heading__actions">
-          <span className="status-chip status-chip--safe">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 text-sm font-bold text-emerald-200">
             <span aria-hidden="true">◇</span>
             조건·안전 확인 완료
           </span>
-          <Link href="/choice" className="button button--ghost">
+          <Link
+            href="/choice"
+            className="inline-flex min-h-11 items-center rounded-full border border-slate-700 bg-white/5 px-4 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+          >
             조건 바꾸기
           </Link>
         </div>
@@ -259,54 +312,81 @@ export function CompletedView({
       ) : null}
 
       {response.topPick ? (
-        <div className="results-hero-grid">
+        <section aria-labelledby="top-pick-heading">
+          <h2 id="top-pick-heading" className="sr-only">가장 먼저 추천하는 작품</h2>
           <ContentCard
             item={response.topPick}
             rank={1}
             hero
+            conditionSummary={response.conditionSummary}
             onReplace={onReplace}
             replacing={replacingId === response.topPick.content.id}
             replacementPending={replacingId !== null}
           />
-          <RecommendationTimeline response={response} />
-        </div>
+        </section>
       ) : (
-        <div className="empty-state">
-          <span aria-hidden="true">◇</span>
-          <h2>조건에 맞는 안전한 작품이 없어요.</h2>
-          <p>
+        <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
+          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-800 text-xl text-slate-400" aria-hidden="true">◇</span>
+          <h2 className="mt-4 text-2xl font-black text-white">
+            조건에 맞는 안전한 작품이 없어요.
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-slate-300">
             조건을 자동으로 바꾸지 않았어요. 조건 선택 화면에서 다시 골라
             주세요.
           </p>
-          <Link href="/choice" className="button button--primary">
+          <Link
+            href="/choice"
+            className="mt-6 inline-flex min-h-12 items-center rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+          >
             조건 다시 고르기
           </Link>
-        </div>
+        </section>
       )}
 
-      {alternatives.length ? (
-        <section className="alternative-section">
-          <div className="result-section-heading">
+      {response.topPick ? (
+        <section className="mt-12" aria-labelledby="alternative-results-heading">
+          <div className="mb-5 flex items-end justify-between gap-4">
             <div>
-              <p className="eyebrow">ALSO FOR YOU</p>
-              <h2>함께 비교해 볼 작품</h2>
+              <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+                ALSO FOR YOU
+              </p>
+              <h2 id="alternative-results-heading" className="mt-1 text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">
+                함께 비교해 볼 작품
+              </h2>
             </div>
-            <span>{alternatives.length}편</span>
+            <span className="hidden text-sm font-bold text-slate-400 sm:inline">
+              추천 {alternatives.length}편 · 광고/안내 1개
+            </span>
           </div>
-          <div className="content-grid content-grid--four">
-            {alternatives.map((item, index) => (
-              <ContentCard
-                item={item}
-                rank={index + 2}
-                  key={item.content.id}
-                onReplace={onReplace}
-                replacing={replacingId === item.content.id}
-                replacementPending={replacingId !== null}
+          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:thin] md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-3 xl:grid-cols-5">
+            {alternatives.length
+              ? alternatives.map((item, index) => (
+                  <ContentCard
+                    item={item}
+                    rank={index + 2}
+                    rail
+                    key={item.content.id}
+                    onReplace={onReplace}
+                    replacing={replacingId === item.content.id}
+                    replacementPending={replacingId !== null}
+                  />
+                ))
+              : null}
+            <div className="w-[min(76vw,17rem)] shrink-0 snap-center md:w-auto">
+              <SponsoredVideoAd
+                placement="RESULT"
+                theme="dark"
+                runId={response.runId}
+                variant="rail"
               />
-            ))}
+            </div>
           </div>
         </section>
       ) : null}
+
+      <div className="mt-8">
+        <RecommendationTimeline response={response} />
+      </div>
     </>
   );
 }
@@ -394,7 +474,10 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
 
   async function decide(decision: ApprovalDecision) {
     const proposal =
-      response?.status === "awaiting_approval" ? response.proposal : null;
+      response?.status === "awaiting_approval" &&
+      response.proposal.kind === "RUNTIME_RELAXATION"
+        ? response.proposal
+        : null;
     setDeciding(decision);
     setActionError("");
     try {
@@ -508,49 +591,45 @@ export function RecommendationView({ runId }: RecommendationViewProps) {
   }
 
   if (loading) {
-    return (
-      <div className="result-loading" role="status">
-        <span className="result-loading__mark" aria-hidden="true">
-          D
-        </span>
-        <p className="eyebrow">추천 준비 중</p>
-        <h1>선택한 조건을 차례로 확인하고 있어요.</h1>
-        <ol>
-          <li>고른 조건 확인</li>
-          <li>어울리는 후보 비교</li>
-          <li>마지막 안전 확인</li>
-        </ol>
-      </div>
-    );
+    return <RecommendationWaitingScreen stage={2} theme="dark" />;
   }
 
   if (error || !response) {
     return (
-      <div className="empty-state empty-state--error">
-        <span aria-hidden="true">!</span>
-        <h1>추천 기록을 불러오지 못했어요.</h1>
-        <p>{error || "추천 기록이 만료되었거나 저장소에 없을 수 있어요."}</p>
-        <div>
-          <button
-            className="button button--ghost"
-            onClick={() => {
-              setLoading(true);
-              setError("");
-              void loadRun();
-            }}
-          >
-            다시 시도
-          </button>
-          <Link href="/choice" className="button button--primary">
-            새 추천 받기
-          </Link>
-        </div>
+      <div className="app-container my-12">
+        <section className="flex min-h-[28rem] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] p-8 text-center">
+          <span className="grid size-14 place-items-center rounded-2xl bg-red-400/10 text-xl font-black text-red-300" aria-hidden="true">!</span>
+          <h1 className="mt-4 text-2xl font-black text-white sm:text-3xl">
+            추천 기록을 불러오지 못했어요.
+          </h1>
+          <p className="mt-3 max-w-xl text-base leading-7 text-slate-300">
+            {error || "추천 기록이 만료되었거나 저장소에 없을 수 있어요."}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              className="min-h-12 rounded-full border border-slate-700 bg-white/5 px-5 text-sm font-black text-slate-200 hover:border-slate-500 focus-visible:outline-2 focus-visible:outline-orange-400"
+              onClick={() => {
+                setLoading(true);
+                setError("");
+                void loadRun();
+              }}
+            >
+              다시 시도
+            </button>
+            <Link
+              href="/choice"
+              className="inline-flex min-h-12 items-center rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-5 text-sm font-black text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            >
+              새 추천 받기
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="results-page">
+    <div className="app-container results-page overflow-x-clip py-8 pb-20 sm:py-12">
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>

@@ -21,7 +21,7 @@ export function StepNavigation({
 
   return (
     <footer className="choice-stepper-actions" aria-label="단계 이동">
-      <div className="choice-stepper-actions__inner">
+      <div className="app-container choice-stepper-actions__inner">
         {currentStep > 1 ? (
           <button
             type="button"

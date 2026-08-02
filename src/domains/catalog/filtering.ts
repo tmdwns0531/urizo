@@ -10,6 +10,9 @@ export const FILTER_REASONS = [
   "ALREADY_WATCHED",
   "UNSUBSCRIBED_PROVIDER",
   "ORIGIN_MISMATCH",
+  "MEDIA_TYPE_MISMATCH",
+  "REQUIRED_GENRE_MISMATCH",
+  "EXCLUDED_GENRE",
   "DISLIKED_GENRE",
   "COMPANION_AVOID_GENRE",
   "NOT_INTERESTED",
@@ -34,10 +37,13 @@ const isKoreanContent = (content: CatalogContent): boolean =>
   content.originCountries.includes("KR") ||
   content.productionCountries.includes("KR");
 
+const CHILD_RATING_RANK = { ALL: 0, "7": 1, "12": 2, "15": 3 } as const;
+
 /**
  * Anonymous eligibility is intentionally independent of UserContext. `18` and
- * `UNKNOWN` are always unsafe; WITH_CHILDREN further limits results to
- * ALL/7/12. Natural language is not consulted for any mandatory filter.
+ * `UNKNOWN` are always unsafe; WITH_CHILDREN further limits results to the
+ * user-approved viewing-rating threshold. A missing child threshold fails
+ * closed. Natural language is not consulted for any mandatory filter.
  */
 export function getMvpFilterReasons(
   content: CatalogContent,
@@ -51,9 +57,14 @@ export function getMvpFilterReasons(
   if (content.ageRating === "UNKNOWN") {
     reasons.push("RATING_UNKNOWN_FOR_MINOR");
   }
+  const childAgeRatingLimit = input.childAgeRatingLimit ?? null;
   if (
     input.companions.includes("WITH_CHILDREN") &&
-    !["ALL", "7", "12"].includes(content.ageRating) &&
+    (childAgeRatingLimit === null ||
+      (CHILD_RATING_RANK[
+        content.ageRating as keyof typeof CHILD_RATING_RANK
+      ] ?? Number.POSITIVE_INFINITY) >
+        CHILD_RATING_RANK[childAgeRatingLimit]) &&
     !reasons.includes("AGE_RESTRICTED") &&
     !reasons.includes("RATING_UNKNOWN_FOR_MINOR")
   ) {
@@ -83,6 +94,22 @@ export function getMvpFilterReasons(
     (input.originPreference === "NON_KR" && isKorean)
   ) {
     reasons.push("ORIGIN_MISMATCH");
+  }
+
+  const mediaType = input.mediaType ?? "ANY";
+  if (mediaType !== "ANY" && content.mediaType !== mediaType) {
+    reasons.push("MEDIA_TYPE_MISMATCH");
+  }
+
+  const requiredGenres = input.requiredGenres ?? [];
+  if (
+    requiredGenres.length > 0 &&
+    !intersects(content.genres, requiredGenres)
+  ) {
+    reasons.push("REQUIRED_GENRE_MISMATCH");
+  }
+  if (intersects(content.genres, input.excludedGenres ?? [])) {
+    reasons.push("EXCLUDED_GENRE");
   }
 
   const explicitlyRequested = intersects(

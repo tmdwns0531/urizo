@@ -1,4 +1,4 @@
-# OTT 다모아 v0.8 Demo/LIVE architecture
+# OTT 다모아 v0.9 bounded-Agent Demo/LIVE architecture
 
 ## Authority
 
@@ -64,20 +64,39 @@ orchestrator의 server-side port 안에서만 호출된다.
 
 ```text
 strict anonymous request validation
--> mandatory catalog eligibility
--> local or pgvector candidate search
--> ranking and diversity scoring
--> deterministic or OpenAI selector inside budget
+-> bounded Agent structures neutral natural-language conditions
+-> at most one ambiguity question before search
+-> Agent calls the server-only searchCatalog tool once
+-> mandatory catalog eligibility + local/pgvector search + scoring
+-> deterministic or OpenAI allowlist selection inside budget
 -> response-time mandatory policy recheck
--> approval, safe fallback, or completion
+-> policy-owned runtime proposal + user approval + at most one re-search
+-> safe rule-based fallback or completion
 -> sanitized Run snapshot and ordered Trace append
 -> PUBLIC Trace projection
 ```
 
-연령, provider, runtime, origin, 제외, replacement 조건은 selector가 결정하지
-않는다. OpenAI selector는 필터와 점수가 끝난 후보 ID allowlist 안에서만 최대
-5개를 고른다. 모델 오류·timeout·invalid output·예산 초과는 정제된 fallback
-reason으로 바뀌며 raw prompt나 provider 오류는 응답·Run·Trace에 남기지 않는다.
+제한형 Agent는 질문 1회, `searchCatalog` 호출 1회, 승인 후 재검색 1회의 상한을
+가진다. 연령, provider, runtime, origin, 제외, replacement 조건은 Agent나 selector가
+결정하거나 임의로 완화하지 않는다. 조건 변경 가능 여부와 후보 부족 기준은
+Policy가 소유한다. 고정 CHOICE 프리셋의 허용 변경은 사용자 승인 후
+`runtime 30 → 45`이며, 자연어에서 30분 미만의 정확한 분 단위 제한을 말한 경우
+그 제한을 먼저 적용한 뒤 후보가 부족할 때만 `runtime <30 → 30`을 제안한다.
+OpenAI selector는 필터와 점수가 끝난 후보 ID allowlist 안에서만 최대 5개를
+고른다. 모델 오류·timeout·invalid output·예산 초과는 같은 조건의 rule-based
+1위부터 반환하는 fallback으로 바뀌며 raw prompt나 provider 오류는 응답·Run·Trace에
+남기지 않는다.
+
+가족 관련 1회 질문은 구성과 아이 관람등급을 함께 확정한다. 일반적인 `가족`
+입력에는 `성인 가족 / 전체 / 7 / 12 / 15`를 한 번에 제시하고, `아이·자녀`가
+명시되면 `전체 / 7 / 12 / 15`만 제시한다. 응답은 실제 나이가 아닌
+`childAgeRatingLimit` 정책 상한으로 sanitized input에 저장되며 catalog 필터와 최종
+정책 재검사가 같은 상한을 적용한다. 상한 없이 WITH_CHILDREN 검색을 실행하려는
+경로는 fail closed한다.
+
+`searchCatalog`는 composition에서 선택된 저장 카탈로그와 local/pgvector search
+adapter만 사용한다. runtime 요청 중 TMDB를 호출하지 않으며, 도구 호출과 Agent
+선택은 각각 기존 `vector_search`, `select` PUBLIC Trace action으로 투명하게 표시한다.
 
 최초 LIVE 실행에서 embedding과 selector는 공통 model-call·token·deadline 예산을
 소비한다. 승인은 저장 vector를 재사용하고 selector를 실행하며, 교체는 저장
@@ -92,7 +111,7 @@ vector·ranking·policy를 재사용하지만 selector 모델은 재호출하지
 - `openai-text-embedding-3-small-v1`, 1536차원
 
 Run에는 sanitized input, vector, `sha256:<64 lowercase hex>` fingerprint만 저장한다.
-교체는 이 세 값을 그대로 사용한다. 30분 → 45분 승인은 승인된 sanitized
+교체는 이 세 값을 그대로 사용한다. 런타임 완화 승인은 승인된 sanitized
 runtime과 기존 vector로 서버가 새 fingerprint를 계산한 뒤 continuation을
 검증한다. raw text, token, matched term은 재구성하거나 저장하지 않는다.
 
@@ -116,9 +135,16 @@ Run별 원자적 sequence, append-only Trace를 함께 반영하며 일부만 �
 상세 필드와 migration 원칙은 [`ERD-v0.8-live.md`](./ERD-v0.8-live.md)를 따른다.
 
 최초 추천은 sanitized request만 있는 `RUNNING`을 먼저 저장한 뒤 실행한다.
-terminal/승인 상태는 실제 mode·fingerprint·vector·response를 갖추고, 실패는 raw
+terminal/runtime 승인 상태는 실제 mode·fingerprint·vector·response를 갖추고, 실패는 raw
 오류 없이 `FAILED + INTERNAL_ERROR`로 저장한다. 승인 실행은 먼저 RUNNING CAS를
 성공한 한 요청만 계속하며, 완료/실패와 Trace를 다시 원자 커밋한다.
+
+`AWAITING_APPROVAL`에는 두 가지 멀티턴 shape이 있다. 검색 전 가족 구성 질문은
+`FAMILY_COMPOSITION` proposal과 sanitized condition만 가지며 mode·fingerprint·vector가
+아직 없다. 검색 후 후보 부족 제안은 `RUNTIME_RELAXATION` proposal과 실제 검색
+continuation을 모두 가진다. 둘 다 같은 revision CAS와 Trace transaction 경계를
+사용하고, 자연어 원문은 후속 답변에서도 일시적으로만 전달되어 Run에 저장되지
+않는다.
 
 ## Catalog ingestion
 

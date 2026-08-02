@@ -33,7 +33,7 @@ export const LANDING_POSTERS: readonly LandingPoster[] = [
     year: 2009,
     detail: "드라마 · 일상",
     provider: "Netflix",
-    posterUrl: tmdbPoster("/2ybwRRpPqAwRca6S2qqXk2MjmW2.jpg"),
+    posterUrl: tmdbPoster("/4a4BE3OgS3slYh1U4lCJAh7ZKVr.jpg"),
     backdropColor: "#76513d",
   },
   {

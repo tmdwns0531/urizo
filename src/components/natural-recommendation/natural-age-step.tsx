@@ -28,8 +28,8 @@ export function NaturalAgeStep({
     familyType === "ADULTS" || (familyType === "KIDS" && childAge !== null);
 
   return (
-    <main className="mx-auto flex w-full max-w-[50rem] flex-1 items-start px-5 py-10 pb-28 sm:items-center sm:px-6 sm:py-16">
-      <section className="w-full" aria-labelledby="clarify-age-title">
+    <main className="app-container flex flex-1 items-start py-10 pb-28 sm:items-center sm:py-16">
+      <section className="mx-auto w-full max-w-5xl" aria-labelledby="clarify-age-title">
         <header>
           <p className="choice-stepper__eyebrow">한 가지만 더 확인할게요</p>
           <h1
@@ -38,7 +38,7 @@ export function NaturalAgeStep({
           >
             가족과 함께 본다고 이해했어요.
           </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400 sm:text-base">
+          <p className="mt-3 text-base leading-7 text-slate-300">
             안전한 작품을 고르기 위해 함께 보는 가족 구성을 알려주세요.
           </p>
         </header>
@@ -105,14 +105,14 @@ export function NaturalAgeStep({
                         onChange={() => onChildAgeChange(option.value)}
                       />
                       <span className="block">{option.label}</span>
-                      <small className={selected ? "text-orange-100" : "text-slate-600"}>
+                      <small className={`text-sm leading-6 ${selected ? "text-orange-100" : "text-slate-400"}`}>
                         {option.hint}
                       </small>
                     </label>
                   );
                 })}
               </div>
-              <p className="mt-4 rounded-xl bg-slate-950/55 px-4 py-3 text-xs leading-5 text-slate-400">
+              <p className="mt-4 rounded-xl bg-slate-950/55 px-4 py-3 text-sm leading-6 text-slate-300">
                 현재 추천 엔진은 정확한 연령 대신 아이 동반 공통 기준
                 (전체·7세·12세)을 더 안전하게 적용해요. 선택한 등급은 Choice
                 화면으로 이어집니다.

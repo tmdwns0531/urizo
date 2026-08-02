@@ -1,5 +1,6 @@
 import type { OttProvider } from "@/contracts/catalog";
 import type {
+  ChildAgeRatingLimit,
   MvpRecommendationRequest,
   OriginPreference,
 } from "@/contracts/mvp-search";
@@ -174,12 +175,21 @@ export function resolveCompanionChoice(state: ChoiceDraftPayload) {
   return state.who ?? "ANY";
 }
 
+export function childAgeToRatingLimit(
+  childAge: ChildAge | null,
+): ChildAgeRatingLimit | null {
+  if (childAge === "PRESCHOOL") return "ALL";
+  if (childAge === "AGE_7") return "7";
+  if (childAge === "AGE_12") return "12";
+  if (childAge === "AGE_15") return "15";
+  return null;
+}
+
 /**
- * Creates the strict v0.7 recommendation payload. `familyType` and `childAge`
- * remain in the route-local draft because the active public DTO has no fields
- * for them; including either raw value would produce UNKNOWN_FIELD. The family
- * branch is instead mapped to FAMILY or WITH_CHILDREN. The selected age band
- * is not an engine filter in this API version.
+ * Creates the strict anonymous recommendation payload. `familyType` and
+ * `childAge` remain route-local values; the family branch is mapped to FAMILY
+ * or WITH_CHILDREN and the selected age band becomes a viewing-rating policy
+ * threshold rather than an exact age.
  */
 export function buildRecommendationRequest(
   state: ChoiceFormState,
@@ -197,6 +207,10 @@ export function buildRecommendationRequest(
       companions: [companion],
       moods: mood && mood !== "ANY" ? [mood] : [],
       maxRuntimeMinutes: draft.duration ?? null,
+      childAgeRatingLimit:
+        companion === "WITH_CHILDREN"
+          ? childAgeToRatingLimit(draft.childAge)
+          : null,
       originPreference: draft.origin ?? "ANY",
       desiredGenres,
       explicitlyRequestedGenres: desiredGenres,

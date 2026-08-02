@@ -238,17 +238,36 @@ function fingerprintPayload(
   input: SanitizedRecommendationSearchInput,
   queryVector: QueryVectorSnapshot,
 ): Record<string, unknown> {
+  const normalizedInitialChoiceWithoutNaturalLanguage: Record<string, unknown> = {
+    companionAvoidGenres: sortStrings(input.companionAvoidGenres),
+    companions: sortStrings(input.companions),
+    desiredGenres: sortStrings(input.desiredGenres),
+    hasNaturalLanguage: input.hasNaturalLanguage,
+    maxRuntimeMinutes: input.maxRuntimeMinutes,
+    moods: sortStrings(input.moods),
+    originPreference: input.originPreference,
+    selectedProviders: sortStrings(input.selectedProviders),
+  };
+  if (input.childAgeRatingLimit != null) {
+    normalizedInitialChoiceWithoutNaturalLanguage.childAgeRatingLimit =
+      input.childAgeRatingLimit;
+  }
+  if (input.mediaType != null && input.mediaType !== "ANY") {
+    normalizedInitialChoiceWithoutNaturalLanguage.mediaType = input.mediaType;
+  }
+  if ((input.requiredGenres?.length ?? 0) > 0) {
+    normalizedInitialChoiceWithoutNaturalLanguage.requiredGenres = sortStrings(
+      input.requiredGenres,
+    );
+  }
+  if ((input.excludedGenres?.length ?? 0) > 0) {
+    normalizedInitialChoiceWithoutNaturalLanguage.excludedGenres = sortStrings(
+      input.excludedGenres,
+    );
+  }
+
   return {
-    normalizedInitialChoiceWithoutNaturalLanguage: {
-      companionAvoidGenres: sortStrings(input.companionAvoidGenres),
-      companions: sortStrings(input.companions),
-      desiredGenres: sortStrings(input.desiredGenres),
-      hasNaturalLanguage: input.hasNaturalLanguage,
-      maxRuntimeMinutes: input.maxRuntimeMinutes,
-      moods: sortStrings(input.moods),
-      originPreference: input.originPreference,
-      selectedProviders: sortStrings(input.selectedProviders),
-    },
+    normalizedInitialChoiceWithoutNaturalLanguage,
     queryVector: {
       algorithm: queryVector.algorithm,
       dimensions: queryVector.dimensions,

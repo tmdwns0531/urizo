@@ -15,9 +15,7 @@ export default async function RecommendationPage({
 
   return (
     <AppShell active="results">
-      <div className="page-shell">
-        <RecommendationView runId={runId} />
-      </div>
+      <RecommendationView runId={runId} />
     </AppShell>
   );
 }

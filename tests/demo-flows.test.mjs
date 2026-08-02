@@ -125,13 +125,13 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
     const html = await response.text();
     assert.match(html, /OTT 다모아/);
     assert.match(html, /오늘 볼 작품/);
-    assert.match(html, /지금 상황부터/);
+    assert.match(html, /지금 상황 반영/);
     assert.match(html, /<nav\b/i);
     assert.match(html, /<main\b/i);
     assert.match(html, /<footer\b/i);
     assert.match(html, /href="\/choice"/i);
     assert.match(html, /조건 골라 추천받기/);
-    assert.match(html, /한마디로 추천받기/);
+    assert.match(html, /문장으로 추천받기/);
     assert.match(html, /href="\/prompt"/i);
     assert.doesNotMatch(
       html,
@@ -267,6 +267,31 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
       `/api/recommendations/${encodeURIComponent(created.runId)}`,
     );
     assert.doesNotMatch(JSON.stringify(fetched.body), new RegExp(canary));
+  });
+
+  await t.test("continues one Agent clarification turn through the approval endpoint", async () => {
+    await resetDemo();
+    const source = "가족과 따뜻한 작품을 보고 싶어";
+    const awaiting = await createRecommendation(
+      { choice: { naturalLanguage: source } },
+      "Agent clarification run",
+    );
+    assert.equal(awaiting.status, "awaiting_approval");
+    assert.equal(awaiting.proposal.kind, "FAMILY_COMPOSITION");
+    assert.equal(awaiting.partialRecommendations.length, 0);
+    assert.doesNotMatch(JSON.stringify(awaiting), new RegExp(source));
+
+    const answered = await jsonRequest(
+      `/api/recommendations/${encodeURIComponent(awaiting.runId)}/approval`,
+      {
+        method: "POST",
+        json: { answer: "ADULTS_ONLY", naturalLanguage: source },
+      },
+    );
+    assertStatus(answered, 200, "answer Agent clarification");
+    assert.equal(answered.body.status, "completed");
+    assert.equal(answered.body.recommendations.length, 5);
+    assert.doesNotMatch(JSON.stringify(answered.body), new RegExp(source));
   });
 
   await t.test("requires approval before a 30 to 45 minute relaxation", async () => {

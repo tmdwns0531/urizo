@@ -1,6 +1,7 @@
 import type { CatalogRepository } from "../../contracts/ports";
 import type {
   MvpApprovalProposal,
+  MvpNoResultState,
   MvpRecommendationExecutionResult,
   NewTraceEvent,
 } from "../../contracts/mvp-recommendation";
@@ -12,6 +13,7 @@ import type {
 import { MVP_BUDGET_LIMITS } from "../../contracts/mvp-recommendation";
 import { RESULT_LIMIT } from "../../config/recommendation";
 import { getMvpFilterReasons } from "../catalog/filtering";
+import { askRuntimeRelaxation } from "./agent/conversation";
 import { BudgetCounter, BudgetExceededError } from "./budget";
 import type {
   MvpRecommendationExecutor,
@@ -25,6 +27,7 @@ export type MvpPolicyResult =
       recommendations: MvpRecommendationExecutionResult["selected"];
       execution: MvpRecommendationExecutionResult;
       policyBlockedCount: number;
+      noResult?: MvpNoResultState;
       notice?: string;
       traceEvents: NewTraceEvent[];
     }
@@ -59,12 +62,61 @@ function publicTrace(
 function sanitizedInput(
   invocation: RecommendationSearchInvocation,
 ): SanitizedRecommendationSearchInput {
-  if (invocation.kind === "continuation") {
-    return invocation.input;
+  const source = invocation.input;
+  return {
+    selectedProviders: [...source.selectedProviders],
+    companions: [...source.companions],
+    moods: [...source.moods],
+    desiredGenres: [...source.desiredGenres],
+    companionAvoidGenres: [...source.companionAvoidGenres],
+    requiredGenres: [...(source.requiredGenres ?? [])],
+    excludedGenres: [...(source.excludedGenres ?? [])],
+    mediaType: source.mediaType ?? "ANY",
+    maxRuntimeMinutes: source.maxRuntimeMinutes,
+    childAgeRatingLimit: source.childAgeRatingLimit ?? null,
+    originPreference: source.originPreference,
+    hasNaturalLanguage: source.hasNaturalLanguage,
+  };
+}
+
+function filterTraceMessage(
+  input: SanitizedRecommendationSearchInput,
+): string {
+  const mediaType =
+    input.mediaType === "MOVIE"
+      ? "영화만 남기는 작품 유형 조건"
+      : input.mediaType === "SERIES"
+        ? "시리즈만 남기는 작품 유형 조건"
+        : "작품 유형 제한 없음";
+  const genreConditions =
+    input.requiredGenres.length > 0 || input.excludedGenres.length > 0
+      ? ", 필수·제외 장르"
+      : "";
+  return `연령과 이용 가능한 OTT, 선택한 시간, 제작 국가${genreConditions}, ${mediaType}을 먼저 확인했어요.`;
+}
+
+export function createNoResultState(
+  input: SanitizedRecommendationSearchInput,
+): MvpNoResultState {
+  const availableActions: MvpNoResultState["availableActions"] = [];
+  if (input.maxRuntimeMinutes !== null) {
+    availableActions.push("EXTEND_RUNTIME");
   }
-  const { naturalLanguage, ...input } = invocation.input;
-  void naturalLanguage;
-  return input;
+  if ((input.mediaType ?? "ANY") !== "ANY") {
+    availableActions.push("ALLOW_ANY_MEDIA_TYPE");
+  }
+  availableActions.push("REENTER_CONDITIONS");
+  return {
+    code: "NO_MATCHING_CONTENT",
+    message: "현재 조건을 모두 만족하는 작품이 없어요.",
+    availableActions,
+  };
+}
+
+function proposedRuntimeMinutes(currentMinutes: number | null): number | null {
+  if (currentMinutes === null || currentMinutes >= 45) return null;
+  if (currentMinutes < 30) return 30;
+  return 45;
 }
 
 export class PolicyLayer {
@@ -145,15 +197,15 @@ export class PolicyLayer {
       publicTrace(
         "filter",
         "고른 조건을 먼저 확인했어요",
-        "연령과 이용 가능한 OTT, 선택한 시간, 제작 국가와 제외 장르를 먼저 확인했어요.",
+        filterTraceMessage(input),
         { eligibleCount: execution.eligibleCount },
       ),
       publicTrace(
         "vector_search",
-        "현재 요청과 가까운 작품을 찾았어요",
+        "searchCatalog 도구로 저장된 작품을 찾았어요",
         invocation.kind === "initial" && invocation.input.hasNaturalLanguage
-          ? "적어주신 문장은 저장하지 않고 요청과 가까운 작품을 찾았어요."
-          : "고른 조건과 가까운 작품을 찾았어요.",
+          ? "적어주신 문장은 저장하지 않고 저장된 카탈로그에서 가까운 작품을 찾았어요."
+          : "저장된 카탈로그에서 고른 조건과 가까운 작품을 찾았어요.",
         { candidateCount: execution.ranked.length },
       ),
       publicTrace(
@@ -164,8 +216,8 @@ export class PolicyLayer {
       ),
       publicTrace(
         "select",
-        "최종 추천 작품을 골랐어요",
-        "조건을 통과한 후보 안에서 최종 추천 작품을 골랐어요.",
+        "제한형 Agent가 허용 후보 안에서 골랐어요",
+        "Agent가 searchCatalog가 반환한 후보 ID 안에서만 최종 추천 작품을 골랐어요.",
         {
           resultCount: execution.selected.length,
           modelCalls: execution.budgetSnapshot.modelCalls,
@@ -224,17 +276,24 @@ export class PolicyLayer {
       selected: recommendations,
     };
 
+    const proposedRuntime = proposedRuntimeMinutes(input.maxRuntimeMinutes);
     if (
       !execution.fallbackUsed &&
-      input.maxRuntimeMinutes === 30 &&
+      invocation.kind === "initial" &&
+      input.maxRuntimeMinutes !== null &&
+      proposedRuntime !== null &&
       (scenario === "approval" || recommendations.length < RESULT_LIMIT)
     ) {
       const proposal: MvpApprovalProposal = {
         kind: "RUNTIME_RELAXATION",
-        currentMaxMinutes: 30,
-        proposedMaxMinutes: 45,
+        currentMaxMinutes: input.maxRuntimeMinutes,
+        proposedMaxMinutes: proposedRuntime,
         currentCandidateCount: recommendations.length,
-        question: `30분 이내로는 ${recommendations.length}편만 찾았어요. 45분까지 넓혀서 다시 찾아볼까요?`,
+        question: askRuntimeRelaxation(
+          recommendations.length,
+          input.maxRuntimeMinutes,
+          proposedRuntime,
+        ),
         approveLabel: "넓혀서 다시 찾기",
         rejectLabel: `${recommendations.length}편만 보기`,
       };
@@ -244,7 +303,7 @@ export class PolicyLayer {
           "조건을 바꾸기 전에 확인을 기다리고 있어요",
           proposal.question,
           {
-            effectiveRuntimeMinutes: 30,
+            effectiveRuntimeMinutes: input.maxRuntimeMinutes,
             resultCount: recommendations.length,
           },
         ),
@@ -259,7 +318,12 @@ export class PolicyLayer {
       };
     }
 
+    const noResult: MvpNoResultState | undefined =
+      recommendations.length === 0
+        ? createNoResultState(input)
+        : undefined;
     const notice =
+      noResult?.message ??
       execution.notice ??
       (recommendations.length < RESULT_LIMIT
         ? `조건에 맞는 작품을 ${recommendations.length}편 찾았어요. 조건을 임의로 완화하지 않았습니다.`
@@ -281,6 +345,7 @@ export class PolicyLayer {
       recommendations,
       execution,
       policyBlockedCount: blocked.length,
+      ...(noResult ? { noResult } : {}),
       ...(notice ? { notice } : {}),
       traceEvents,
     };

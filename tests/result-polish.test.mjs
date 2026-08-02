@@ -40,6 +40,30 @@ test("approval progress copy reads runtime values from its proposal", async () =
   assert.ok(view.includes("response.proposal.currentMaxMinutes"));
 });
 
+test("result cards identify movie and per-episode series runtimes", async () => {
+  const card = await read("src/components/content-card.tsx");
+  const labelHelper = card.match(
+    /function mediaRuntimeLabel[\s\S]*?\n\}/,
+  )?.[0];
+
+  assert.ok(labelHelper, "media/runtime label helper must exist");
+  assert.ok(
+    labelHelper.includes("`영화 · ${runtimeMinutes}분`"),
+    "movie cards must render 영화 · N분",
+  );
+  assert.ok(
+    labelHelper.includes("`시리즈 · 회당 ${runtimeMinutes}분`"),
+    "series cards must identify the per-episode runtime",
+  );
+  assert.equal(
+    card.match(
+      /mediaRuntimeLabel\(content\.mediaType, content\.runtimeMinutes\)/g,
+    )?.length,
+    2,
+    "hero and standard cards must use the same media/runtime label",
+  );
+});
+
 test("poster and provider card keep shared accessible visual semantics", async () => {
   const [poster, css] = await Promise.all([
     read("src/components/poster-art.tsx"),

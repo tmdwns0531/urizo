@@ -40,16 +40,16 @@ export function LandingFeatures() {
   return (
     <section
       id="how-it-works"
-      className="cinema-features scroll-mt-20 border-b border-white/10 bg-[#0f141a] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+      className="cinema-features scroll-mt-20 border-b border-white/10 bg-[#0f141a] py-20 sm:py-28"
       aria-labelledby="features-title"
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="app-container">
         <div className="max-w-3xl">
-          <p className="text-xs font-bold tracking-[0.18em] text-[#66d9c0] sm:text-sm">추천할 때 지키는 네 가지 기준</p>
+          <p className="text-sm font-bold tracking-[0.14em] text-[#7ce4cd]">추천할 때 지키는 네 가지 기준</p>
           <h2 id="features-title" className="mt-3 text-balance text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
             고른 조건을 지키면서 추천해요.
           </h2>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">
+          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">
             시청 가능한 시간과 OTT를 먼저 확인하고, 원하는 느낌과 취향에
             맞는 작품을 골라드려요.
           </p>
@@ -65,10 +65,10 @@ export function LandingFeatures() {
                     <FeatureIcon id={feature.id} />
                   </span>
                 </span>
-                <span className="text-xs font-extrabold tracking-[0.16em] text-slate-600" aria-hidden="true">{feature.step}</span>
+                <span className="text-sm font-extrabold tracking-[0.14em] text-slate-400" aria-hidden="true">{feature.step}</span>
               </div>
               <h3 className="relative mt-9 text-xl font-extrabold tracking-[-0.025em] text-white sm:text-2xl">{feature.title}</h3>
-              <p className="relative mt-3 max-w-md text-sm leading-6 text-slate-400 sm:text-base sm:leading-7">{feature.description}</p>
+              <p className="relative mt-4 max-w-md text-base leading-7 text-slate-300">{feature.description}</p>
             </li>
           ))}
         </ol>

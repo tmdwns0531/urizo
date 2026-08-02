@@ -4,62 +4,31 @@ import { useRouter } from "next/navigation";
 import type {
   MvpApprovalDecision,
   MvpAwaitingApprovalRecommendationResponse,
+  MvpClarificationAnswer,
   MvpCompletedRecommendationResponse,
   MvpRecommendationResponse,
+  MvpRuntimeRelaxationProposal,
 } from "../../contracts/mvp-recommendation";
+import { SponsoredVideoAd } from "../advertising/sponsored-video-ad";
 import { useChoiceHandoff } from "../choice-handoff/choice-handoff-provider";
 import { ContentCard } from "../content-card";
 import { RecommendationTimeline } from "../recommendation-timeline";
+import { NaturalConditionSummary } from "./natural-condition-summary";
 import type { NaturalInterpretation } from "./natural-language";
 
 type NaturalResultProps = {
   response: MvpRecommendationResponse;
   interpretation: NaturalInterpretation;
-  deciding: MvpApprovalDecision | null;
+  deciding: MvpApprovalDecision | MvpClarificationAnswer | null;
   decisionError: string;
-  onDecision: (decision: MvpApprovalDecision) => void;
+  onDecision: (
+    decision: MvpApprovalDecision | MvpClarificationAnswer,
+  ) => void;
   onSameConditions: () => void;
+  onAllowAnyMediaType: () => void;
   onEditInput: () => void;
   onReset: () => void;
 };
-
-function ConditionTags({ interpretation }: { interpretation: NaturalInterpretation }) {
-  return (
-    <section
-      className="mb-7 rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:p-6"
-      aria-labelledby="interpreted-condition-title"
-    >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="choice-stepper__eyebrow">해석한 조건</p>
-          <h2 id="interpreted-condition-title" className="text-xl font-black text-white sm:text-2xl">
-            직접 말한 조건과 기본값을 나눠 봤어요.
-          </h2>
-        </div>
-        <p className="flex flex-wrap gap-3 text-xs font-bold text-slate-500">
-          <span><i className="mr-1 inline-block size-2 rounded-full bg-orange-500" />직접 말한 조건</span>
-          <span><i className="mr-1 inline-block size-2 rounded-full bg-slate-600" />시스템 기본값</span>
-        </p>
-      </div>
-      <ul className="mt-5 flex flex-wrap gap-2" aria-label="해석된 추천 조건">
-        {interpretation.tags.map((tag) => (
-          <li
-            key={tag.dimension}
-            data-condition-source={tag.source.toLowerCase()}
-            className={`rounded-full border px-3 py-2 text-xs font-bold leading-5 sm:text-sm ${
-              tag.source === "USER"
-                ? "border-orange-500/35 bg-orange-500/10 text-orange-200"
-                : "border-slate-700 bg-slate-800/55 text-slate-400"
-            }`}
-          >
-            <span className="mr-1.5 opacity-60">{tag.dimension}</span>
-            {tag.label}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 function RuntimeApprovalBanner({
   response,
@@ -67,33 +36,60 @@ function RuntimeApprovalBanner({
   error,
   onDecision,
 }: {
-  response: MvpAwaitingApprovalRecommendationResponse;
-  deciding: MvpApprovalDecision | null;
+  response: MvpAwaitingApprovalRecommendationResponse & {
+    proposal: MvpRuntimeRelaxationProposal;
+  };
+  deciding: MvpApprovalDecision | MvpClarificationAnswer | null;
   error: string;
   onDecision: (decision: MvpApprovalDecision) => void;
 }) {
   return (
-    <section className="approval-banner mb-8" aria-labelledby="runtime-approval-title">
-      <div className="approval-banner__icon" aria-hidden="true">?</div>
-      <div className="approval-banner__copy">
-        <p className="eyebrow">조건 변경 전 확인</p>
-        <h2 id="runtime-approval-title" className="mt-1 text-[clamp(1.75rem,3.6vw,2.625rem)] font-black leading-tight tracking-[-0.05em] text-[#0b1f52]">
+    <section
+      className="mb-8 grid gap-5 rounded-3xl border border-white/10 bg-[#191d22] p-5 shadow-[0_24px_70px_rgba(0,0,0,.28)] sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-6 sm:p-7"
+      aria-labelledby="runtime-approval-title"
+    >
+      <div
+        className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-[#ff5430] to-[#ff7c42] text-xl font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.22)] sm:size-14"
+        aria-hidden="true"
+      >
+        ?
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-black tracking-[0.14em] text-orange-300">
+          조건 변경 전 확인
+        </p>
+        <h2
+          id="runtime-approval-title"
+          className="mt-2 text-balance text-[clamp(1.75rem,3.6vw,2.625rem)] font-black leading-tight tracking-[-0.05em] text-white"
+        >
           {response.proposal.question}
         </h2>
-        <p>
+        <p className="mt-3 max-w-3xl text-base leading-7 text-slate-300">
           정확히 맞는 후보가 부족해도 조건을 몰래 바꾸지 않아요. 넓어지는
           조건은 러닝타임뿐이고 OTT·느낌·연령 기준은 그대로 유지합니다.
         </p>
-        <div className="approval-change">
-          <span>현재 <strong>{response.proposal.currentMaxMinutes}분</strong></span>
-          <i aria-hidden="true">→</i>
-          <span>제안 <strong>{response.proposal.proposedMaxMinutes}분</strong></span>
-          <small>현재 조건 후보 {response.proposal.currentCandidateCount}편</small>
+        <div className="mt-5 flex max-w-2xl flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#10151b]/80 p-5 text-sm leading-6 text-slate-300">
+          <span>
+            현재
+            <strong className="ml-1 text-lg text-white">
+              {response.proposal.currentMaxMinutes}분
+            </strong>
+          </span>
+          <i className="not-italic text-orange-400" aria-hidden="true">→</i>
+          <span>
+            제안
+            <strong className="ml-1 text-lg text-orange-300">
+              {response.proposal.proposedMaxMinutes}분
+            </strong>
+          </span>
+          <small className="w-full text-sm text-slate-400 sm:ml-auto sm:w-auto">
+            현재 조건 후보 {response.proposal.currentCandidateCount}편
+          </small>
         </div>
-        <div className="approval-actions">
+        <div className="mt-5 flex flex-wrap gap-3">
           <button
             type="button"
-            className="button button--primary"
+            className="min-h-12 rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.22)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:translate-y-0 disabled:opacity-50"
             disabled={deciding !== null}
             onClick={() => onDecision("approve")}
           >
@@ -103,7 +99,7 @@ function RuntimeApprovalBanner({
           </button>
           <button
             type="button"
-            className="button button--ghost"
+            className="min-h-12 rounded-full border border-slate-700 bg-white/5 px-6 text-sm font-black text-slate-200 transition hover:border-slate-500 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400 disabled:opacity-50"
             disabled={deciding !== null}
             onClick={() => onDecision("reject")}
           >
@@ -112,34 +108,92 @@ function RuntimeApprovalBanner({
               : response.proposal.rejectLabel}
           </button>
         </div>
-        {error ? <p className="form-error approval-error" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="mt-4 text-sm font-bold text-red-300" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
+    </section>
+  );
+}
+
+function AgentClarificationChat({
+  response,
+  deciding,
+  error,
+  onDecision,
+}: {
+  response: MvpAwaitingApprovalRecommendationResponse;
+  deciding: MvpApprovalDecision | MvpClarificationAnswer | null;
+  error: string;
+  onDecision: (answer: MvpClarificationAnswer) => void;
+}) {
+  if (response.proposal.kind !== "FAMILY_COMPOSITION") return null;
+
+  return (
+    <section
+      className="mb-8 rounded-3xl border border-white/10 bg-[#171b21] p-5 shadow-2xl sm:p-7"
+      aria-labelledby="agent-clarification-title"
+      data-agent-chat="clarification"
+    >
+      <p className="choice-stepper__eyebrow">추가 질문</p>
+      <div className="mt-5 flex gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-orange-500 font-black text-white" aria-hidden="true">A</span>
+        <div className="max-w-2xl rounded-2xl rounded-tl-sm bg-white px-5 py-4 text-[#0b1f52]">
+          <h2 id="agent-clarification-title" className="text-lg font-black sm:text-xl">
+            {response.proposal.question}
+          </h2>
+        </div>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-3 pl-0 sm:pl-13" aria-label="추가 질문 답변">
+        {response.proposal.answers.map((answer) => (
+          <button
+            type="button"
+            className="min-h-12 rounded-full border border-orange-400/35 bg-orange-500/10 px-5 text-sm font-black text-orange-200 transition hover:bg-orange-500/20 disabled:opacity-50"
+            disabled={deciding !== null}
+            onClick={() => onDecision(answer.value)}
+            key={answer.value}
+          >
+            {deciding === answer.value ? "조건을 반영하는 중…" : answer.label}
+          </button>
+        ))}
+      </div>
+      {error ? <p className="form-error mt-4" role="alert">{error}</p> : null}
     </section>
   );
 }
 
 function CompletedNaturalResults({
   response,
+  onAllowAnyMediaType,
+  onEditInput,
 }: {
   response: MvpCompletedRecommendationResponse;
+  onAllowAnyMediaType: () => void;
+  onEditInput: () => void;
 }) {
   const alternatives = response.recommendations
     .filter((item) => item.content.id !== response.topPick?.content.id)
     .slice(0, 4);
-  const approvedRuntimeRelaxation = response.trace.some(
-    (event) =>
-      event.action === "approval_decision" &&
-      event.metrics?.effectiveRuntimeMinutes === 45,
-  );
+  const approvedRuntimeMinutes = [...response.trace]
+    .reverse()
+    .find(
+      (event) =>
+        event.action === "approval_decision" && event.title.includes("넓혀"),
+    )?.metrics?.effectiveRuntimeMinutes;
 
   return (
     <>
-      {approvedRuntimeRelaxation ? (
+      {approvedRuntimeMinutes !== undefined ? (
         <aside className="result-notice result-notice--neutral">
           <span aria-hidden="true">✓</span>
           <div>
             <strong>승인한 범위로 시간 조건을 완화했어요.</strong>
-            <p>러닝타임만 45분까지 넓혔고 나머지 조건은 그대로 지켰어요.</p>
+            <p>
+              러닝타임만 {approvedRuntimeMinutes}분까지 넓혔고 나머지 조건은
+              그대로 지켰어요.
+            </p>
           </div>
         </aside>
       ) : null}
@@ -179,8 +233,39 @@ function CompletedNaturalResults({
       ) : (
         <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-800 text-xl text-slate-400" aria-hidden="true">◇</span>
-          <h2 className="mt-4 text-2xl font-black text-white">조건에 맞는 안전한 작품이 없어요.</h2>
-          <p className="mt-2 text-sm text-slate-400">조건을 자동으로 바꾸지 않았어요. 아래에서 조건을 직접 확인해 주세요.</p>
+          <h2 className="mt-4 text-2xl font-black text-white">
+            {response.noResult?.message ?? "현재 조건을 모두 만족하는 작품이 없어요."}
+          </h2>
+          <p className="mt-3 text-base leading-7 text-slate-300">
+            영화·시리즈, 아이 안전, 제외 장르와 선택한 OTT는 자동으로 완화하지 않았어요.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {response.noResult?.availableActions.includes("EXTEND_RUNTIME") ? (
+              <button
+                type="button"
+                className="min-h-12 rounded-full border border-slate-600 px-5 text-sm font-black text-slate-200 hover:border-slate-400 hover:text-white"
+                onClick={onEditInput}
+              >
+                시청 시간 늘리기
+              </button>
+            ) : null}
+            {response.noResult?.availableActions.includes("ALLOW_ANY_MEDIA_TYPE") ? (
+              <button
+                type="button"
+                className="min-h-12 rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-5 text-sm font-black text-white"
+                onClick={onAllowAnyMediaType}
+              >
+                영화·시리즈 모두 보기
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="min-h-12 rounded-full border border-slate-600 px-5 text-sm font-black text-slate-200 hover:border-slate-400 hover:text-white"
+              onClick={onEditInput}
+            >
+              조건 다시 입력하기
+            </button>
+          </div>
         </section>
       )}
 
@@ -193,12 +278,27 @@ function CompletedNaturalResults({
                 나머지 {alternatives.length}편도 비교해 보세요.
               </h2>
             </div>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-400">{alternatives.length}편</span>
+            <span className="hidden text-sm font-bold text-slate-400 sm:inline">
+              추천 {alternatives.length}편 · 광고/안내 1개
+            </span>
           </div>
-          <div className="content-grid content-grid--four mt-4">
+          <div className="mt-4 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:thin] md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-3 xl:grid-cols-5">
             {alternatives.map((item, index) => (
-              <ContentCard item={item} rank={index + 2} key={item.content.id} />
+              <ContentCard
+                item={item}
+                rank={index + 2}
+                rail
+                key={item.content.id}
+              />
             ))}
+            <div className="w-[min(76vw,17rem)] shrink-0 snap-center md:w-auto">
+              <SponsoredVideoAd
+                placement="RESULT"
+                theme="dark"
+                runId={response.runId}
+                variant="rail"
+              />
+            </div>
           </div>
         </section>
       ) : null}
@@ -235,7 +335,7 @@ function ResultActions({
           onClick={continueInChoice}
         >
           디테일하게 직접 고르기
-          <small className="mt-1 font-semibold text-orange-100">현재 조건 유지 →</small>
+          <small className="mt-2 text-sm font-semibold leading-6 text-orange-100">현재 조건 유지 →</small>
         </button>
         <button type="button" className="min-h-24 rounded-2xl border border-slate-700 bg-[#191d22] px-5 text-left font-bold text-slate-200 hover:border-slate-500" onClick={onSameConditions}>
           같은 조건으로 다시 추천받기
@@ -258,6 +358,7 @@ export function NaturalRecommendationResult({
   decisionError,
   onDecision,
   onSameConditions,
+  onAllowAnyMediaType,
   onEditInput,
   onReset,
 }: NaturalResultProps) {
@@ -269,7 +370,9 @@ export function NaturalRecommendationResult({
     title: step.title,
     description: step.description,
     kind:
-      step.source === "USER"
+      step.source === "EXPLICIT" ||
+      step.source === "USER_EDITED" ||
+      step.source === "CLARIFIED"
         ? ("user" as const)
         : step.source === "DEFAULT"
           ? ("default" as const)
@@ -278,7 +381,7 @@ export function NaturalRecommendationResult({
 
   return (
     <main
-      className="mx-auto w-full max-w-[75rem] px-5 py-10 pb-20 sm:px-6 sm:py-14 lg:px-8"
+      className="app-container py-10 pb-20 sm:py-14"
       data-natural-result="true"
     >
       <header className="mb-8 flex flex-wrap items-end justify-between gap-5">
@@ -286,34 +389,46 @@ export function NaturalRecommendationResult({
           <p className="choice-stepper__eyebrow">한마디 추천 결과</p>
           <h1 className="mt-2 text-balance text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
             {response.status === "awaiting_approval"
-              ? "조건을 그대로 지킨 후보가 부족해요."
+              ? response.proposal.kind === "FAMILY_COMPOSITION"
+                ? "한 가지만 더 알려주세요."
+                : "조건을 그대로 지킨 후보가 부족해요."
               : `조건에 맞는 ${displayedCount}편을 찾았어요.`}
           </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400 sm:text-base">
+          <p className="mt-3 text-base leading-7 text-slate-300">
             직접 말한 조건과 시스템 기본값을 구분하고, 왜 골랐는지 함께 보여드려요.
           </p>
         </div>
-        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-300">
+        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm font-bold text-emerald-200">
           조건·안전 확인
         </span>
       </header>
 
-      <ConditionTags interpretation={interpretation} />
+      <NaturalConditionSummary interpretation={interpretation} className="mb-7" />
 
       {response.status === "awaiting_approval" ? (
         <>
-          <RuntimeApprovalBanner
-            response={response}
-            deciding={deciding}
-            error={decisionError}
-            onDecision={onDecision}
-          />
-          {response.partialRecommendations.length ? (
+          {response.proposal.kind === "FAMILY_COMPOSITION" ? (
+            <AgentClarificationChat
+              response={response}
+              deciding={deciding}
+              error={decisionError}
+              onDecision={onDecision}
+            />
+          ) : (
+            <RuntimeApprovalBanner
+              response={{ ...response, proposal: response.proposal }}
+              deciding={deciding}
+              error={decisionError}
+              onDecision={onDecision}
+            />
+          )}
+          {response.proposal.kind === "RUNTIME_RELAXATION" &&
+          response.partialRecommendations.length ? (
             <section className="mb-7" aria-labelledby="partial-result-title">
               <h2 id="partial-result-title" className="mb-4 text-xl font-black text-white">
                 현재 조건을 지킨 후보 {response.partialRecommendations.length}편
               </h2>
-              <div className="content-grid">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
                 {response.partialRecommendations.map((item, index) => (
                   <ContentCard item={item} rank={index + 1} key={item.content.id} />
                 ))}
@@ -322,19 +437,28 @@ export function NaturalRecommendationResult({
           ) : null}
         </>
       ) : (
-        <CompletedNaturalResults response={response} />
+        <>
+          <CompletedNaturalResults
+            response={response}
+            onAllowAnyMediaType={onAllowAnyMediaType}
+            onEditInput={onEditInput}
+          />
+
+          <div className="mt-7">
+            <RecommendationTimeline
+              response={response}
+              interpretationSteps={timelineSteps}
+            />
+          </div>
+
+          <ResultActions
+            interpretation={interpretation}
+            onSameConditions={onSameConditions}
+            onEditInput={onEditInput}
+            onReset={onReset}
+          />
+        </>
       )}
-
-      <div className="mt-7">
-        <RecommendationTimeline response={response} interpretationSteps={timelineSteps} />
-      </div>
-
-      <ResultActions
-        interpretation={interpretation}
-        onSameConditions={onSameConditions}
-        onEditInput={onEditInput}
-        onReset={onReset}
-      />
     </main>
   );
 }

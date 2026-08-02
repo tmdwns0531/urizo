@@ -18,7 +18,7 @@ export function NaturalRecommendationNav({
 
   return (
     <header className="choice-stepper-nav">
-      <nav className="choice-stepper-nav__inner" aria-label="한마디 추천 메뉴">
+      <nav className="app-container choice-stepper-nav__inner" aria-label="한마디 추천 메뉴">
         <Link
           href="/"
           className="choice-stepper-brand"

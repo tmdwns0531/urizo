@@ -1,31 +1,41 @@
 import { NATURAL_LANGUAGE_MAX_CODE_POINTS } from "../../contracts/mvp-search";
+import { NaturalConditionSummary } from "./natural-condition-summary";
 import {
   clampNaturalLanguage,
   countNaturalLanguageCodePoints,
+  type NaturalInterpretation,
+  type NaturalInterpretationOverrideChange,
+  type NaturalInterpretationOverrides,
 } from "./natural-language";
 
 const EXAMPLES = [
-  "혼자 넷플릭스에서 2시간 안에 웃을 수 있는 영화",
-  "아이와 디즈니+에서 볼 따뜻한 작품",
-  "친구들과 티빙에서 긴장감 있는 한국 작품",
+  "아이와 디즈니+에서 1시간 안에 볼 따뜻한 애니메이션 영화",
+  "혼자 넷플릭스에서 30분 정도 가볍게 볼 코미디 시리즈",
+  "친구와 티빙에서 2시간 안에 볼 긴장감 있는 한국 영화",
 ] as const;
 
 export function NaturalInputStep({
   value,
+  interpretation,
+  overrides,
   error,
   onChange,
+  onOverrideChange,
   onSubmit,
 }: {
   value: string;
+  interpretation: NaturalInterpretation | null;
+  overrides: NaturalInterpretationOverrides;
   error: string;
   onChange: (value: string) => void;
+  onOverrideChange: (change: NaturalInterpretationOverrideChange) => void;
   onSubmit: () => void;
 }) {
   const length = countNaturalLanguageCodePoints(value);
 
   return (
-    <main className="mx-auto flex w-full max-w-[50rem] flex-1 items-start px-5 py-10 pb-20 sm:items-center sm:px-6 sm:py-16">
-      <section className="w-full" aria-labelledby="natural-input-title">
+    <main className="app-container flex flex-1 items-start py-10 pb-20 sm:items-center sm:py-16">
+      <section className="mx-auto w-full max-w-5xl" aria-labelledby="natural-input-title">
         <header className="text-center">
           <p className="choice-stepper__eyebrow">한마디 추천 · Beta</p>
           <h1
@@ -35,9 +45,9 @@ export function NaturalInputStep({
             지금 보고 싶은 작품을
             <span className="mt-1 block text-orange-400">편하게 말해 주세요.</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base sm:leading-7">
-            시간, 함께 보는 사람, 이용할 OTT, 원하는 느낌을 한 문장에 모두
-            적지 않아도 괜찮아요. 비어 있는 조건은 구분해서 보여드릴게요.
+          <p className="mx-auto mt-4 max-w-2xl text-balance text-center text-base leading-7 text-slate-300">
+            영화·시리즈, 시청 시간, OTT, 함께 보는 사람, 분위기 중 아는 조건만 한
+            문장으로 적어주세요.
           </p>
         </header>
 
@@ -57,13 +67,13 @@ export function NaturalInputStep({
             rows={4}
             value={value}
             autoFocus
-            placeholder="예: 아이와 넷플릭스에서 2시간 안에 볼 수 있는 따뜻한 한국 영화"
+            placeholder="예: 아이와 디즈니+에서 1시간 안에 볼 따뜻한 애니메이션 영화"
             aria-describedby="natural-request-help natural-request-count"
             aria-invalid={Boolean(error)}
-            className="min-h-36 w-full resize-none rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-4 text-base leading-7 text-white outline-none placeholder:text-slate-600 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 sm:px-5 sm:text-lg"
+            className="min-h-40 w-full resize-none rounded-2xl border border-slate-700 bg-slate-950/70 px-5 py-5 text-base leading-7 text-white outline-none placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 sm:text-lg sm:leading-8"
             onChange={(event) => onChange(clampNaturalLanguage(event.target.value))}
           />
-          <div className="mt-2 flex items-start justify-between gap-4 px-1 text-xs leading-5 text-slate-500">
+          <div className="mt-3 flex items-start justify-between gap-4 px-1 text-sm leading-6 text-slate-400">
             <p id="natural-request-help">개인정보나 계정 정보는 입력하지 마세요.</p>
             <p id="natural-request-count" className="shrink-0 tabular-nums">
               {length}/{NATURAL_LANGUAGE_MAX_CODE_POINTS}
@@ -76,6 +86,16 @@ export function NaturalInputStep({
             </p>
           ) : null}
 
+          {interpretation ? (
+            <NaturalConditionSummary
+              interpretation={interpretation}
+              editableDefaults
+              overrides={overrides}
+              onOverrideChange={onOverrideChange}
+              className="mt-5"
+            />
+          ) : null}
+
           <button
             type="submit"
             disabled={!value.trim()}
@@ -86,7 +106,7 @@ export function NaturalInputStep({
         </form>
 
         <div className="mt-7">
-          <p className="text-center text-xs font-bold text-slate-500">
+          <p className="text-center text-sm font-bold text-slate-400">
             이렇게 말해도 좋아요
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -94,7 +114,7 @@ export function NaturalInputStep({
               <button
                 type="button"
                 key={example}
-                className="min-h-11 rounded-full border border-slate-800 bg-white/[0.03] px-4 py-2 text-left text-xs font-semibold leading-5 text-slate-400 transition hover:border-slate-600 hover:text-slate-200 focus-visible:outline-orange-400 sm:text-sm"
+                className="min-h-12 rounded-full border border-slate-700 bg-white/[0.03] px-5 py-3 text-left text-sm font-semibold leading-6 text-slate-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-orange-400"
                 onClick={() => onChange(example)}
               >
                 {example}

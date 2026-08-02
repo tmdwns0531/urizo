@@ -30,7 +30,7 @@ export function ChoiceNav({ dirty }: ChoiceNavProps) {
 
   return (
     <header className="choice-stepper-nav">
-      <nav className="choice-stepper-nav__inner" aria-label="조건 선택 메뉴">
+      <nav className="app-container choice-stepper-nav__inner" aria-label="조건 선택 메뉴">
         <Link
           href="/"
           className="choice-stepper-brand"

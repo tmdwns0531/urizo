@@ -27,9 +27,9 @@ export function Step5Extra({
           className="text-balance text-3xl font-black tracking-[-0.04em] text-white outline-none sm:text-4xl"
         >
           취향 더하기
-          <span className="ml-2 text-lg font-medium text-slate-500">(선택)</span>
+          <span className="ml-2 text-lg font-medium text-slate-400">(선택)</span>
         </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400 sm:text-base">
+        <p className="mt-2 text-base leading-7 text-slate-300">
           조금 더 원하는 방향이 있다면 골라주세요. 아무것도 선택하지 않아도
           괜찮아요.
         </p>
@@ -70,7 +70,7 @@ export function Step5Extra({
         <fieldset aria-describedby="genre-selection-status">
           <legend className="mb-3 text-sm font-bold text-slate-300">
             선호 장르
-            <span className="ml-2 text-xs font-medium text-slate-500">최대 2개</span>
+            <span className="ml-2 text-sm font-medium text-slate-400">최대 2개</span>
           </legend>
           <div className="flex flex-wrap gap-2">
             {GENRE_OPTIONS.map((option) => {
@@ -84,7 +84,7 @@ export function Step5Extra({
                     isSelected
                       ? "border-orange-500 bg-orange-500/15 text-orange-300"
                       : isBlocked
-                        ? "cursor-not-allowed border-slate-800 text-slate-600"
+                        ? "cursor-not-allowed border-slate-800 text-slate-400"
                         : "border-slate-700 text-slate-400 hover:border-slate-500"
                   }`}
                   aria-pressed={isSelected}
@@ -100,7 +100,7 @@ export function Step5Extra({
           </div>
           <p
             id="genre-selection-status"
-            className="mt-3 text-xs text-slate-500"
+            className="mt-3 text-sm leading-6 text-slate-400"
             aria-live="polite"
           >
             {state.genres.length}/2개 선택

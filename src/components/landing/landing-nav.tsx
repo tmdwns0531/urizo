@@ -4,7 +4,7 @@ export function LandingNav() {
   return (
     <header className="cinema-header absolute inset-x-0 top-0 z-30 border-b border-white/10 bg-[#10151b]/70 backdrop-blur-xl">
       <nav
-        className="cinema-nav mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:h-[4.5rem] sm:gap-4 sm:px-6 lg:px-8"
+        className="app-container cinema-nav flex h-16 items-center gap-2 sm:h-[4.5rem] sm:gap-4"
         aria-label="주요 메뉴"
       >
         <Link
@@ -35,13 +35,30 @@ export function LandingNav() {
           </a>
         </div>
 
-        <Link
-          href="/choice"
-          className="ml-auto inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#ff6b3d] px-4 py-2 text-xs font-bold text-white shadow-[0_8px_30px_rgba(255,107,61,0.22)] transition hover:bg-[#ff7d56] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-5 sm:text-sm"
+        <div
+          className="ml-auto flex shrink-0 items-center text-sm font-extrabold text-slate-200"
+          aria-label="계정 기능 준비 중"
         >
-          <span className="sm:hidden">추천 시작</span>
-          <span className="hidden sm:inline">추천 시작하기</span>
-        </Link>
+          <button
+            type="button"
+            disabled
+            aria-label="회원가입 기능 준비 중"
+            title="회원가입 기능 준비 중"
+            className="inline-flex min-h-11 items-center px-2 transition-colors disabled:cursor-not-allowed disabled:opacity-100 sm:px-3"
+          >
+            회원가입
+          </button>
+          <span className="h-5 w-px bg-white/25" aria-hidden="true" />
+          <button
+            type="button"
+            disabled
+            aria-label="로그인 기능 준비 중"
+            title="로그인 기능 준비 중"
+            className="inline-flex min-h-11 items-center px-2 transition-colors disabled:cursor-not-allowed disabled:opacity-100 sm:px-3"
+          >
+            로그인
+          </button>
+        </div>
       </nav>
     </header>
   );

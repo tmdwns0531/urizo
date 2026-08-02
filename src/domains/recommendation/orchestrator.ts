@@ -11,6 +11,7 @@ import {
 import type {
   AnonymousRecommendationServices,
   MvpApprovalDecision,
+  MvpClarificationAnswer,
   MvpCompletedRecommendationResponse,
   MvpRecommendationResponse,
   NewTraceEvent,
@@ -22,13 +23,22 @@ import type {
   MvpRecommendationRequest,
   RecommendationSearchInvocation,
   SanitizedRecommendationSearchInput,
+  TransientRecommendationSearchInput,
 } from "../../contracts/mvp-search";
+import { NATURAL_LANGUAGE_MAX_CODE_POINTS } from "../../contracts/mvp-search";
 import type { CatalogRepository } from "../../contracts/ports";
 import { getMvpFilterReasons } from "../catalog/filtering";
 import type { MvpRecommendationExecutor } from "./executors/types";
-import { PolicyLayer, type MvpPolicyResult } from "./policy";
+import {
+  createNoResultState,
+  PolicyLayer,
+  type MvpPolicyResult,
+} from "./policy";
 import { createInputFingerprint } from "../search/semantic";
-import { resolveMvpRecommendationRequest } from "./request";
+import {
+  resolveMvpRecommendationRequest,
+  sanitizeMvpSearchInput,
+} from "./request";
 import { readPublicTrace } from "./trace";
 
 interface AnonymousOrchestratorDependencies {
@@ -43,6 +53,77 @@ interface AnonymousOrchestratorDependencies {
     runs: DemoResettable;
     traces: DemoResettable;
   };
+}
+
+const providerLabels: Record<
+  SanitizedRecommendationSearchInput["selectedProviders"][number],
+  string
+> = {
+  NETFLIX: "Netflix",
+  TVING: "TVING",
+  DISNEY_PLUS: "Disney+",
+  WAVVE: "Wavve",
+  WATCHA: "WATCHA",
+  COUPANG_PLAY: "Coupang Play",
+};
+
+const companionLabels: Record<
+  SanitizedRecommendationSearchInput["companions"][number],
+  string
+> = {
+  ALONE: "혼자",
+  PARTNER: "연인과",
+  FRIENDS: "친구와",
+  FAMILY: "가족과",
+  WITH_CHILDREN: "아이와",
+  ANY: "동반자 제한 없음",
+};
+
+/** Public copy made only from the persistence-safe CHOICE snapshot. */
+export function formatRecommendationConditionSummary(
+  input: SanitizedRecommendationSearchInput,
+): string {
+  const providers =
+    input.selectedProviders.length === Object.keys(providerLabels).length
+      ? "모든 OTT"
+      : input.selectedProviders.map((provider) => providerLabels[provider]).join(", ");
+  const runtime = input.maxRuntimeMinutes
+    ? `${input.maxRuntimeMinutes}분 이내`
+    : "시간 제한 없음";
+  const childRating =
+    input.companions.includes("WITH_CHILDREN") && input.childAgeRatingLimit
+      ? input.childAgeRatingLimit === "ALL"
+        ? "전체 관람가"
+        : `${input.childAgeRatingLimit}세 관람가까지`
+      : "";
+  const mediaType =
+    input.mediaType === "MOVIE"
+      ? "영화"
+      : input.mediaType === "SERIES"
+        ? "시리즈"
+        : "작품 유형 제한 없음";
+  const parts = [
+    companionLabels[input.companions[0] ?? "ANY"],
+    mediaType,
+    childRating,
+    providers,
+    runtime,
+    ...input.moods,
+    ...(input.requiredGenres ?? [])
+      .slice(0, 2)
+      .map((genre) => `${genre} 필수`),
+    ...(input.excludedGenres ?? [])
+      .slice(0, 2)
+      .map((genre) => `${genre} 제외`),
+    ...input.desiredGenres.slice(0, 2),
+    input.originPreference === "KR"
+      ? "한국 작품"
+      : input.originPreference === "NON_KR"
+        ? "해외 작품"
+        : "",
+  ];
+
+  return parts.filter(Boolean).join(" · ");
 }
 
 function publicTrace(
@@ -89,6 +170,7 @@ function responseSnapshot(
     topPick: result.recommendations[0] ?? null,
     fallbackUsed: result.execution.fallbackUsed,
     policyBlockedCount: result.policyBlockedCount,
+    ...(result.noResult ? { noResult: result.noResult } : {}),
     ...(result.notice ? { notice: result.notice } : {}),
     createdAt,
     updatedAt,
@@ -109,9 +191,17 @@ export class AnonymousRecommendationOrchestrator
     });
     const runId = createId("run");
     const startedAt = new Date().toISOString();
+    const preparation = this.dependencies.executor.prepareInitial?.(
+      resolved.transientInput,
+    ) ?? {
+      input: resolved.transientInput,
+      clarification: null,
+    };
+    const structuredInput = preparation.input;
+    const structuredSanitizedInput = sanitizeMvpSearchInput(structuredInput);
     const invocation: RecommendationSearchInvocation = {
       kind: "initial",
-      input: resolved.transientInput,
+      input: structuredInput,
     };
     const runningRun: StoredRecommendationRun = {
       id: runId,
@@ -119,7 +209,7 @@ export class AnonymousRecommendationOrchestrator
       revision: 0,
       executionMode: null,
       inputFingerprint: null,
-      requestSnapshot: resolved.sanitizedInput,
+      requestSnapshot: structuredSanitizedInput,
       queryVector: null,
       responseSnapshot: null,
       excludedContentIds: [],
@@ -141,6 +231,42 @@ export class AnonymousRecommendationOrchestrator
     await this.dependencies.persistence.createRunWithTraceEvents(runningRun, []);
 
     try {
+      const clarification = preparation.clarification;
+      if (clarification) {
+        const updatedAt = new Date().toISOString();
+        const snapshot: StoredResponseSnapshot = {
+          status: "awaiting_approval",
+          runId,
+          proposal: clarification,
+          partialRecommendations: [],
+          fallbackUsed: false,
+          policyBlockedCount: 0,
+          createdAt: startedAt,
+          updatedAt,
+        };
+        const updated =
+          await this.dependencies.persistence.updateRunWithTraceEvents(
+            runId,
+            runningRun.revision,
+            {
+              status: "AWAITING_APPROVAL",
+              requestSnapshot: structuredSanitizedInput,
+              responseSnapshot: snapshot,
+              updatedAt,
+            },
+            [
+              publicTrace(
+                "approval_request",
+                "제한형 Agent가 모호한 조건을 확인해요",
+                clarification.question,
+                { toolCalls: 0 },
+              ),
+            ],
+          );
+        this.updatedRunOrThrow(updated);
+        return this.getRequiredResponse(runId);
+      }
+
       const result = await this.dependencies.policy.execute(
         runId,
         invocation,
@@ -204,7 +330,12 @@ export class AnonymousRecommendationOrchestrator
     if (
       run.status === "RUNNING" ||
       !run.responseSnapshot ||
-      !isMaterializedStoredRecommendationRun(run)
+      (!isMaterializedStoredRecommendationRun(run) &&
+        !(
+          run.status === "AWAITING_APPROVAL" &&
+          run.responseSnapshot.status === "awaiting_approval" &&
+          run.responseSnapshot.proposal.kind === "FAMILY_COMPOSITION"
+        ))
     ) {
       throw new RecommendationRunStateError(
         "The recommendation run is not ready for public access.",
@@ -212,27 +343,57 @@ export class AnonymousRecommendationOrchestrator
     }
     return {
       ...run.responseSnapshot,
+      conditionSummary: formatRecommendationConditionSummary(
+        run.requestSnapshot,
+      ),
       trace: await readPublicTrace(this.dependencies.traces, runId),
     } as MvpRecommendationResponse;
   }
   async decideApproval(
     runId: string,
-    decision: MvpApprovalDecision,
+    decision: MvpApprovalDecision | MvpClarificationAnswer,
+    naturalLanguage = "",
   ): Promise<MvpRecommendationResponse> {
     const run = await this.requireRun(runId);
     if (
       run.status !== "AWAITING_APPROVAL" ||
-      run.responseSnapshot?.status !== "awaiting_approval" ||
-      !isMaterializedStoredRecommendationRun(run)
+      run.responseSnapshot?.status !== "awaiting_approval"
     ) {
       throw new RecommendationRunStateError(
         "The recommendation run is not waiting for approval.",
       );
     }
 
+    if (run.responseSnapshot.proposal.kind === "FAMILY_COMPOSITION") {
+      if (decision === "approve" || decision === "reject") {
+        throw new RecommendationRunStateError(
+          "The clarification response is invalid.",
+        );
+      }
+      return this.continueAfterFamilyClarification(
+        run,
+        decision,
+        naturalLanguage,
+      );
+    }
+
+    if (
+      !isMaterializedStoredRecommendationRun(run) ||
+      (decision !== "approve" && decision !== "reject")
+    ) {
+      throw new RecommendationRunStateError(
+        "The runtime approval response is invalid.",
+      );
+    }
+    const runtimeProposal = run.responseSnapshot.proposal;
+
     if (decision === "reject") {
       const now = new Date().toISOString();
       const recommendations = run.responseSnapshot.partialRecommendations;
+      const noResult =
+        recommendations.length === 0
+          ? createNoResultState(run.requestSnapshot)
+          : undefined;
       const snapshot: StoredResponseSnapshot = {
         status: "completed",
         runId,
@@ -240,7 +401,10 @@ export class AnonymousRecommendationOrchestrator
         topPick: recommendations[0] ?? null,
         fallbackUsed: false,
         policyBlockedCount: run.policyBlockCount,
-        notice: `30분 조건에 맞는 ${recommendations.length}편만 보여드려요.`,
+        ...(noResult ? { noResult } : {}),
+        notice:
+          noResult?.message ??
+          `${runtimeProposal.currentMaxMinutes}분 조건에 맞는 ${recommendations.length}편만 보여드려요.`,
         createdAt: run.createdAt,
         updatedAt: now,
       };
@@ -253,14 +417,17 @@ export class AnonymousRecommendationOrchestrator
       }, [
         publicTrace(
           "approval_decision",
-          "30분 조건을 그대로 유지했어요",
+          `${runtimeProposal.currentMaxMinutes}분 조건을 그대로 유지했어요`,
           "조건을 넓히지 않고 현재 안전한 부분 결과로 추천을 마쳤습니다.",
-          { effectiveRuntimeMinutes: 30, resultCount: recommendations.length },
+          {
+            effectiveRuntimeMinutes: runtimeProposal.currentMaxMinutes,
+            resultCount: recommendations.length,
+          },
         ),
         publicTrace(
           "complete",
           "부분 결과로 추천을 마쳤어요",
-          `30분 조건을 지킨 ${recommendations.length}편을 보여드립니다.`,
+          `${runtimeProposal.currentMaxMinutes}분 조건을 지킨 ${recommendations.length}편을 보여드립니다.`,
           { resultCount: recommendations.length },
         ),
       ]);
@@ -270,7 +437,7 @@ export class AnonymousRecommendationOrchestrator
 
     const approvedInput: SanitizedRecommendationSearchInput = {
       ...run.requestSnapshot,
-      maxRuntimeMinutes: 45,
+      maxRuntimeMinutes: runtimeProposal.proposedMaxMinutes,
     };
     const approvedInputFingerprint = await createInputFingerprint(
       approvedInput,
@@ -292,9 +459,9 @@ export class AnonymousRecommendationOrchestrator
       [
         publicTrace(
           "approval_decision",
-          "45분까지 넓혀 다시 찾았어요",
-          "사용자가 승인한 runtime만 45분으로 바꾸고 나머지 조건은 유지했습니다.",
-          { effectiveRuntimeMinutes: 45 },
+          `${runtimeProposal.proposedMaxMinutes}분까지 넓혀 다시 찾았어요`,
+          `사용자가 승인한 러닝타임만 ${runtimeProposal.proposedMaxMinutes}분으로 바꾸고 나머지 조건은 유지했습니다.`,
+          { effectiveRuntimeMinutes: runtimeProposal.proposedMaxMinutes },
         ),
       ],
     );
@@ -369,6 +536,139 @@ export class AnonymousRecommendationOrchestrator
       throw error;
     }
   }
+
+  private async continueAfterFamilyClarification(
+    run: StoredRecommendationRun,
+    answer: MvpClarificationAnswer,
+    naturalLanguage: string,
+  ): Promise<MvpRecommendationResponse> {
+    const transientText = naturalLanguage.trim();
+    if (
+      (run.requestSnapshot.hasNaturalLanguage && !transientText) ||
+      Array.from(transientText).length > NATURAL_LANGUAGE_MAX_CODE_POINTS
+    ) {
+      throw new RecommendationRunStateError(
+        "The transient clarification context is invalid.",
+      );
+    }
+
+    const resolveClarification =
+      this.dependencies.executor.resolveFamilyClarification;
+    if (!resolveClarification) {
+      throw new RecommendationRunStateError(
+        "The active executor cannot resolve an Agent clarification.",
+      );
+    }
+    const transientInput: TransientRecommendationSearchInput =
+      resolveClarification.call(
+        this.dependencies.executor,
+        {
+          ...run.requestSnapshot,
+          hasNaturalLanguage: transientText.length > 0,
+          naturalLanguage: transientText,
+        },
+        answer,
+      );
+    const clarifiedInput = sanitizeMvpSearchInput(transientInput);
+    const childRatingLabel =
+      clarifiedInput.childAgeRatingLimit === "ALL"
+        ? "전체 관람가"
+        : clarifiedInput.childAgeRatingLimit
+          ? `${clarifiedInput.childAgeRatingLimit}세 관람가까지`
+          : null;
+    const transitionedAt = new Date().toISOString();
+    const transition =
+      await this.dependencies.persistence.updateRunWithTraceEvents(
+        run.id,
+        run.revision,
+        {
+          status: "RUNNING",
+          requestSnapshot: clarifiedInput,
+          responseSnapshot: null,
+          errorCode: null,
+          completedAt: null,
+          updatedAt: transitionedAt,
+        },
+        [
+          publicTrace(
+            "approval_decision",
+            "추가 답변을 조건에 반영했어요",
+            childRatingLabel
+              ? `아이와 함께 보는 조건에 ${childRatingLabel} 기준을 적용하고 검색을 시작했어요.`
+              : "성인 가족끼리 보는 조건으로 검색을 시작했어요.",
+          ),
+        ],
+      );
+    const runningRun = this.updatedRunOrThrow(transition);
+    const invocation: RecommendationSearchInvocation = {
+      kind: "initial",
+      input: transientInput,
+    };
+
+    try {
+      const result = await this.dependencies.policy.execute(
+        run.id,
+        invocation,
+        this.dependencies.executor,
+        "normal",
+        "configured",
+      );
+      const now = new Date().toISOString();
+      const snapshot = responseSnapshot(run.id, run.createdAt, now, result);
+      const execution = result.execution;
+      const updated =
+        await this.dependencies.persistence.updateRunWithTraceEvents(
+          run.id,
+          runningRun.revision,
+          {
+            status:
+              result.status === "awaiting_approval"
+                ? "AWAITING_APPROVAL"
+                : "COMPLETED",
+            executionMode: execution.executionMode,
+            requestSnapshot: clarifiedInput,
+            inputFingerprint: execution.continuation.inputFingerprint,
+            queryVector: execution.continuation.queryVector,
+            responseSnapshot: snapshot,
+            excludedContentIds: [
+              ...new Set([
+                ...run.excludedContentIds,
+                ...execution.excludedContentIds,
+              ]),
+            ],
+            candidateCount: execution.ranked.length,
+            resultCount:
+              result.status === "completed"
+                ? result.recommendations.length
+                : result.partialRecommendations.length,
+            modelCallCount:
+              run.modelCallCount + execution.budgetSnapshot.modelCalls,
+            toolCallCount:
+              run.toolCallCount + execution.budgetSnapshot.toolCalls,
+            totalTokens: run.totalTokens + execution.budgetSnapshot.tokens,
+            durationMs: run.durationMs + execution.durationMs,
+            policyBlockCount:
+              run.policyBlockCount + result.policyBlockedCount,
+            fallbackReason: execution.fallbackReason,
+            errorCode: null,
+            completedAt: result.status === "completed" ? now : null,
+            updatedAt: now,
+          },
+          result.traceEvents,
+        );
+      this.updatedRunOrThrow(updated);
+      return this.getRequiredResponse(run.id);
+    } catch (error) {
+      await this.recordFailureWithoutMasking(
+        run.id,
+        runningRun.revision,
+        transitionedAt,
+        runningRun.durationMs,
+      );
+      throw error;
+    }
+  }
+
   async replace(
     runId: string,
     contentId: string,

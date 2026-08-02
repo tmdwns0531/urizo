@@ -27,7 +27,7 @@ function SummaryRow({ step, label, children, onEdit }: SummaryRowProps) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-b border-white/10 py-5 first:pt-0 last:border-b-0 last:pb-0">
       <div className="min-w-0">
-        <dt className="text-xs font-black uppercase tracking-[0.12em] text-orange-400">
+        <dt className="text-sm font-black uppercase tracking-[0.1em] text-orange-300">
           Step {step} · {label}
         </dt>
         <dd className="mt-1 min-w-0 break-words text-base font-bold leading-7 text-white sm:text-lg">
@@ -96,7 +96,7 @@ export function Step6Summary({ state, onEdit }: Step6SummaryProps) {
         >
           이 조건으로 추천을 시작할까요?
         </h2>
-        <p className="mt-3 text-sm text-slate-400 sm:text-base">
+        <p className="mt-3 text-base leading-7 text-slate-300">
           입력한 조건을 다시 확인해 주세요.
         </p>
       </header>
@@ -105,7 +105,7 @@ export function Step6Summary({ state, onEdit }: Step6SummaryProps) {
         <SummaryRow step={1} label="누구와" onEdit={onEdit}>
           {whoLabel}
           {state.who === "FAMILY" && state.familyType === "KIDS" ? (
-            <small className="mt-1 block text-xs font-medium leading-5 text-slate-500">
+            <small className="mt-2 block text-sm font-medium leading-6 text-slate-400">
               선택한 관람 등급은 현재 결과 필터에 직접 반영되지 않으며, 아이
               동반 공통 기준(전체·7세·12세)이 적용돼요.
             </small>

@@ -22,16 +22,19 @@ import {
 } from "../../domains/search/semantic";
 
 function sanitizeInitialInput(
-  invocation: Extract<RecommendationSearchInvocation, { kind: "initial" }>,
+  input: RecommendationSearchInvocation["input"],
 ): SanitizedRecommendationSearchInput {
-  const input = invocation.input;
   return {
     selectedProviders: [...input.selectedProviders],
     companions: [...input.companions],
     moods: [...input.moods],
     desiredGenres: [...input.desiredGenres],
     companionAvoidGenres: [...input.companionAvoidGenres],
+    requiredGenres: [...(input.requiredGenres ?? [])],
+    excludedGenres: [...(input.excludedGenres ?? [])],
+    mediaType: input.mediaType ?? "ANY",
     maxRuntimeMinutes: input.maxRuntimeMinutes,
+    childAgeRatingLimit: input.childAgeRatingLimit ?? null,
     originPreference: input.originPreference,
     hasNaturalLanguage: input.hasNaturalLanguage,
   };
@@ -73,7 +76,7 @@ export class LocalSearchAdapter
     let inputFingerprint;
 
     if (invocation.kind === "initial") {
-      sanitizedInput = sanitizeInitialInput(invocation);
+      sanitizedInput = sanitizeInitialInput(invocation.input);
       queryVector = createLocalQueryVector(
         buildMvpSearchQuery(invocation.input),
       );
@@ -82,7 +85,7 @@ export class LocalSearchAdapter
         queryVector,
       );
     } else {
-      sanitizedInput = invocation.input;
+      sanitizedInput = sanitizeInitialInput(invocation.input);
       queryVector = await verifyRecommendationSearchContinuation(
         sanitizedInput,
         invocation.continuation,

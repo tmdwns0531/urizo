@@ -41,13 +41,16 @@ test("landing page is split into focused production components", async () => {
   for (const component of [
     "LandingNav",
     "LandingHero",
-    "SupportedProviderStrip",
     "RecommendationShowcase",
     "LandingFeatures",
     "LandingFooter",
   ]) {
     assert.ok(composition.includes(component), `${component} must be composed`);
   }
+  assert.ok(
+    !composition.includes("SupportedProviderStrip"),
+    "provider guidance must live inside the hero instead of a separate strip",
+  );
 });
 
 test("hero exposes separate active condition and prompt CTAs", async () => {
@@ -56,11 +59,14 @@ test("hero exposes separate active condition and prompt CTAs", async () => {
   const hero = sources[2];
 
   assert.match(hero, /href="\/choice"[\s\S]*data-cta="primary"/);
-  assert.match(hero, /data-cta="primary"[\s\S]*bg-\[#ff6b3d\]/);
+  assert.match(
+    hero,
+    /data-cta="primary"[\s\S]*from-\[#ff5430\][\s\S]*to-\[#ff7c42\]/,
+  );
   assert.match(hero, /조건 골라 추천받기/);
   assert.match(hero, /href="\/prompt"[\s\S]*data-cta="secondary"/);
-  assert.match(hero, /data-cta="secondary"[\s\S]*bg-white\/5/);
-  assert.match(hero, /한마디로 추천받기/);
+  assert.match(hero, /data-cta="secondary"[\s\S]*bg-\[#17202a\]/);
+  assert.match(hero, /문장으로 추천받기/);
   assert.match(hero, /Beta/);
   assert.doesNotMatch(hero, /disabled|준비 중/);
   assert.doesNotMatch(all, /fetch\(|useState|useRouter/);
@@ -135,8 +141,9 @@ test("landing copy matches the actual Choice flow and user perspective", async (
   }
 });
 
-test("landing exposes only implemented anonymous MVP actions", async () => {
+test("landing exposes recommendation actions and planned account controls", async () => {
   const all = (await readLandingSources()).join("\n");
+  const nav = await read("src/components/landing/landing-nav.tsx");
 
   assert.doesNotMatch(
     all,
@@ -144,12 +151,43 @@ test("landing exposes only implemented anonymous MVP actions", async () => {
   );
   assert.doesNotMatch(
     all,
-    /SIGN IN|CREATE ACCOUNT|회원가입|무료로 가입|커뮤니티/i,
+    /CREATE ACCOUNT|무료로 가입|커뮤니티/i,
   );
   assert.doesNotMatch(all, /href=["']#["']/);
   assert.match(all, /href="\/choice"/);
   assert.match(all, /href="\/prompt"/);
-  assert.match(all, /계정 없이 바로 사용/);
+  assert.match(nav, />\s*회원가입\s*</);
+  assert.match(nav, />\s*로그인\s*</);
+  assert.equal(
+    [...nav.matchAll(/<button\b[\s\S]*?\bdisabled\b[\s\S]*?<\/button>/g)].length,
+    2,
+  );
+  assert.doesNotMatch(all, /익명 추천 서비스|계정 없이/);
+});
+
+test("hero uses a smaller poster hierarchy and keeps OTT guidance below independent CTAs", async () => {
+  const hero = await read("src/components/landing/landing-hero.tsx");
+  const composition = await read("src/components/landing/landing-page.tsx");
+
+  assert.match(hero, /aspect-\[2\/3\]/);
+  assert.match(hero, /bg-cover/);
+  assert.match(hero, /bg-no-repeat/);
+  assert.doesNotMatch(hero, /bg-contain|rotate-\[-2deg\]|border-white\/15 bg-\[#18212b\]\/90 p-2/);
+  assert.match(hero, /h-\[32rem\][\s\S]*max-w-\[28rem\]/);
+  assert.equal([...hero.matchAll(/data-poster-emphasis=/g)].length, 1);
+  assert.match(hero, /index === 0 \? "main" : "supporting"/);
+  assert.equal(
+    [...hero.matchAll(/^\s*"(?:left|right|bottom)/gm)].length,
+    6,
+  );
+  assert.match(
+    hero,
+    /문장으로 추천받기[\s\S]*이용 중인 OTT를 선택하면, 그 안에서 볼 수 있는 작품만 추천해요\./,
+  );
+  assert.match(hero, /SUPPORTED_PROVIDERS\.join\(" · "\)/);
+  assert.match(hero, /지금 상황 반영 · 추천 이유 제공/);
+  assert.doesNotMatch(hero, /OTT 조건 반영|추천 이유 공개|고르는 시간은 짧게/);
+  assert.doesNotMatch(composition, /SupportedProviderStrip/);
 });
 
 test("landing keeps semantic and responsive contracts", async () => {

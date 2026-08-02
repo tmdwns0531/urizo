@@ -91,6 +91,10 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
   assert.deepEqual(resolved.transientInput.companions, ["ANY"]);
   assert.equal(resolved.transientInput.selectedProviders.length, 6);
   assert.equal(resolved.transientInput.maxRuntimeMinutes, null);
+  assert.equal(resolved.transientInput.childAgeRatingLimit, null);
+  assert.equal(resolved.transientInput.mediaType, "ANY");
+  assert.deepEqual(resolved.transientInput.requiredGenres, []);
+  assert.deepEqual(resolved.transientInput.excludedGenres, []);
   assert.equal(resolved.sanitizedInput.naturalLanguage, undefined);
 
   assert.throws(
@@ -112,6 +116,109 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
     ["따뜻한"],
     "one meaningful condition is sufficient",
   );
+  assert.equal(
+    request.resolveMvpRecommendationRequest({
+      choice: {
+        companions: ["WITH_CHILDREN"],
+        childAgeRatingLimit: "7",
+      },
+    }).choice.childAgeRatingLimit,
+    "7",
+  );
+  const hardConditions = request.resolveMvpRecommendationRequest({
+    choice: {
+      mediaType: "SERIES",
+      requiredGenres: ["코미디"],
+      excludedGenres: ["공포"],
+    },
+  });
+  assert.equal(hardConditions.sanitizedInput.mediaType, "SERIES");
+  assert.deepEqual(hardConditions.sanitizedInput.requiredGenres, ["코미디"]);
+  assert.deepEqual(hardConditions.sanitizedInput.excludedGenres, ["공포"]);
+
+  const parsedNaturalMedia = request.resolveMvpRecommendationRequest({
+    choice: { naturalLanguage: "아이와 한시간동안 볼 영화" },
+  });
+  assert.equal(parsedNaturalMedia.choice.mediaType, "MOVIE");
+  assert.equal(parsedNaturalMedia.sanitizedInput.mediaType, "MOVIE");
+  assert.equal(
+    request.resolveMvpRecommendationRequest({
+      choice: {
+        naturalLanguage: "영화만 추천해줘",
+        mediaType: "ANY",
+      },
+    }).sanitizedInput.mediaType,
+    "ANY",
+    "an explicit structured edit must take priority over natural source text",
+  );
+
+  const naturalOnly = request.resolveMvpRecommendationRequest({
+    choice: {
+      naturalLanguage:
+        "혼자 넷플릭스에서 45분 안에 볼 따뜻한 한국 코미디 시리즈",
+    },
+  }).sanitizedInput;
+  assert.deepEqual(naturalOnly.companions, ["ALONE"]);
+  assert.deepEqual(naturalOnly.selectedProviders, ["NETFLIX"]);
+  assert.deepEqual(naturalOnly.moods, ["따뜻한"]);
+  assert.deepEqual(naturalOnly.desiredGenres, ["코미디"]);
+  assert.equal(naturalOnly.maxRuntimeMinutes, 45);
+  assert.equal(naturalOnly.originPreference, "KR");
+  assert.equal(naturalOnly.mediaType, "SERIES");
+
+  const explicitlyNeutral = request.resolveMvpRecommendationRequest({
+    choice: {
+      naturalLanguage:
+        "혼자 넷플릭스에서 45분 안에 볼 따뜻한 한국 코미디 시리즈",
+      selectedProviders: [
+        "NETFLIX",
+        "TVING",
+        "DISNEY_PLUS",
+        "WAVVE",
+        "WATCHA",
+        "COUPANG_PLAY",
+      ],
+      companions: ["ANY"],
+      moods: [],
+      desiredGenres: [],
+      requiredGenres: [],
+      excludedGenres: [],
+      maxRuntimeMinutes: null,
+      originPreference: "ANY",
+      mediaType: "ANY",
+    },
+  }).sanitizedInput;
+  assert.equal(explicitlyNeutral.selectedProviders.length, 6);
+  assert.deepEqual(explicitlyNeutral.companions, ["ANY"]);
+  assert.deepEqual(explicitlyNeutral.moods, []);
+  assert.deepEqual(explicitlyNeutral.desiredGenres, []);
+  assert.deepEqual(explicitlyNeutral.requiredGenres, []);
+  assert.deepEqual(explicitlyNeutral.excludedGenres, []);
+  assert.equal(explicitlyNeutral.maxRuntimeMinutes, null);
+  assert.equal(explicitlyNeutral.originPreference, "ANY");
+  assert.equal(explicitlyNeutral.mediaType, "ANY");
+
+  assert.equal(
+    request.resolveMvpRecommendationRequest({
+      choice: {
+        naturalLanguage: "혼자 45분 안에 볼 영화",
+        maxRuntimeMinutes: 60,
+        naturalRuntimeMinutes: 90,
+      },
+    }).sanitizedInput.maxRuntimeMinutes,
+    90,
+    "an exact natural runtime must take priority over the fixed preset field",
+  );
+  assert.equal(
+    request.resolveMvpRecommendationRequest({
+      choice: {
+        naturalLanguage: "혼자 45분 안에 볼 영화",
+        naturalRuntimeMinutes: null,
+      },
+    }).sanitizedInput.maxRuntimeMinutes,
+    null,
+    "an explicit null runtime must not be repopulated from source text",
+  );
 
   for (const invalid of [
     { userId: "forbidden" },
@@ -120,6 +227,16 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
     { choice: { companions: ["ALONE", "FRIENDS"] } },
     { choice: { moods: ["따뜻한", "따뜻한"] } },
     { choice: { maxRuntimeMinutes: 45 } },
+    { choice: { naturalRuntimeMinutes: 0 } },
+    { choice: { naturalRuntimeMinutes: 181 } },
+    { choice: { naturalRuntimeMinutes: 1.5 } },
+    { choice: { naturalRuntimeMinutes: "45" } },
+    { choice: { mediaType: "SHORT_FORM" } },
+    { choice: { requiredGenres: ["코미디", "코미디"] } },
+    { choice: { excludedGenres: "공포" } },
+    { choice: { requiredGenres: ["코미디"], excludedGenres: ["코미디"] } },
+    { choice: { childAgeRatingLimit: "16" } },
+    { choice: { companions: ["FAMILY"], childAgeRatingLimit: "7" } },
     { choice: { selectedProviders: ["NETFLIX", "NETFLIX"] } },
     { choice: { companions: ["FAMILY"], companionAvoidGenres: ["공포"] } },
     {
@@ -207,6 +324,69 @@ test("LIVE request validation is strict, neutral, Unicode-safe, and transient", 
   );
 });
 
+test("family clarification follows the resolved structured companion", async () => {
+  const request = await loadModule("src/domains/recommendation/request.ts");
+  const conversation = await loadModule(
+    "src/domains/recommendation/agent/conversation.ts",
+  );
+
+  const structuredFamily = request.resolveMvpRecommendationRequest({
+    choice: { companions: ["FAMILY"] },
+  }).transientInput;
+  assert.equal(
+    conversation.createFamilyClarification(structuredFamily)?.kind,
+    "FAMILY_COMPOSITION",
+  );
+
+  const naturalFamily = request.resolveMvpRecommendationRequest({
+    choice: { naturalLanguage: "가족과 함께 볼 따뜻한 영화" },
+  }).transientInput;
+  assert.equal(
+    conversation.createFamilyClarification(naturalFamily)?.kind,
+    "FAMILY_COMPOSITION",
+  );
+
+  const editedToAlone = request.resolveMvpRecommendationRequest({
+    choice: {
+      naturalLanguage: "가족과 함께 볼 따뜻한 영화",
+      companions: ["ALONE"],
+    },
+  }).transientInput;
+  assert.equal(
+    conversation.createFamilyClarification(editedToAlone),
+    null,
+    "a structured companion edit must beat stale family wording",
+  );
+
+  const neutralInput = request.resolveMvpRecommendationRequest({
+    choice: {
+      naturalLanguage:
+        "혼자 넷플릭스에서 45분 안에 볼 따뜻한 한국 코미디 영화",
+      selectedProviders: [
+        "NETFLIX",
+        "TVING",
+        "DISNEY_PLUS",
+        "WAVVE",
+        "WATCHA",
+        "COUPANG_PLAY",
+      ],
+      companions: ["ANY"],
+      moods: [],
+      desiredGenres: [],
+      requiredGenres: [],
+      excludedGenres: [],
+      maxRuntimeMinutes: null,
+      originPreference: "ANY",
+      mediaType: "ANY",
+    },
+  }).transientInput;
+  assert.deepEqual(
+    conversation.structureAgentInput(neutralInput),
+    neutralInput,
+    "the Agent preparation step must not re-infer explicit neutral values",
+  );
+});
+
 test("JSON request bodies enforce the UTF-8 byte ceiling before parsing", async () => {
   const http = await loadModule("src/app/api/_shared/http.ts");
   const searchContract = await loadModule("src/contracts/mvp-search.ts");
@@ -245,7 +425,7 @@ test("JSON request bodies enforce the UTF-8 byte ceiling before parsing", async 
   );
 });
 
-test("anonymous eligibility enforces age, provider, runtime, origin, and avoid genre", async () => {
+test("anonymous eligibility enforces all hard catalog conditions", async () => {
   const request = await loadModule("src/domains/recommendation/request.ts");
   const filtering = await loadModule("src/domains/catalog/filtering.ts");
   const input = request.resolveMvpRecommendationRequest({
@@ -253,6 +433,9 @@ test("anonymous eligibility enforces age, provider, runtime, origin, and avoid g
       selectedProviders: ["NETFLIX"],
       companions: ["FRIENDS"],
       companionAvoidGenres: ["공포"],
+      requiredGenres: ["드라마"],
+      excludedGenres: ["다큐멘터리"],
+      mediaType: "MOVIE",
       maxRuntimeMinutes: 120,
       originPreference: "KR",
     },
@@ -283,6 +466,44 @@ test("anonymous eligibility enforces age, provider, runtime, origin, and avoid g
     filtering.getFilterReasons(content({ genres: ["공포"] }), input)
       .includes("COMPANION_AVOID_GENRE"),
   );
+  assert.ok(
+    filtering
+      .getFilterReasons(content({ mediaType: "SERIES" }), input)
+      .includes("MEDIA_TYPE_MISMATCH"),
+  );
+  const seriesInput = {
+    ...input,
+    mediaType: "SERIES",
+  };
+  assert.equal(
+    filtering
+      .getFilterReasons(content({ mediaType: "SERIES" }), seriesInput)
+      .includes("MEDIA_TYPE_MISMATCH"),
+    false,
+  );
+  assert.ok(
+    filtering
+      .getFilterReasons(content({ mediaType: "MOVIE" }), seriesInput)
+      .includes("MEDIA_TYPE_MISMATCH"),
+  );
+  assert.ok(
+    filtering
+      .getFilterReasons(content({ genres: ["코미디"] }), input)
+      .includes("REQUIRED_GENRE_MISMATCH"),
+  );
+  assert.ok(
+    filtering
+      .getFilterReasons(content({ genres: ["드라마", "다큐멘터리"] }), input)
+      .includes("EXCLUDED_GENRE"),
+  );
+  assert.deepEqual(
+    filtering.getFilterReasons(content({ mediaType: "SERIES" }), {
+      ...input,
+      mediaType: "ANY",
+    }),
+    [],
+    "ANY는 영화와 시리즈를 모두 허용해야 한다",
+  );
 
   const explicitInput = {
     ...input,
@@ -292,6 +513,30 @@ test("anonymous eligibility enforces age, provider, runtime, origin, and avoid g
     filtering.getFilterReasons(content({ genres: ["공포"] }), explicitInput)
       .includes("COMPANION_AVOID_GENRE"),
     false,
+  );
+
+  const childInput = request.resolveMvpRecommendationRequest({
+    choice: {
+      companions: ["WITH_CHILDREN"],
+      childAgeRatingLimit: "7",
+    },
+  }).sanitizedInput;
+  assert.deepEqual(
+    filtering.getFilterReasons(content({ ageRating: "7" }), childInput),
+    [],
+  );
+  assert.ok(
+    filtering.getFilterReasons(content({ ageRating: "12" }), childInput)
+      .includes("AGE_RESTRICTED"),
+  );
+  assert.ok(
+    filtering
+      .getFilterReasons(content({ ageRating: "ALL" }), {
+        ...childInput,
+        childAgeRatingLimit: null,
+      })
+      .includes("AGE_RESTRICTED"),
+    "아이 관람등급 상한이 없으면 검색 정책은 fail closed여야 한다",
   );
 });
 
@@ -318,6 +563,55 @@ test("local search produces deterministic privacy-safe continuation", async () =
   assert.equal(initial.continuation.queryVector.values.every(Number.isFinite), true);
   assert.doesNotMatch(JSON.stringify(initial.continuation), /비 오는 날|위로받고/);
   assert.equal("matchedTerms" in initial.results[0], false);
+
+  const legacySanitizedInput = { ...resolved.sanitizedInput };
+  delete legacySanitizedInput.childAgeRatingLimit;
+  delete legacySanitizedInput.mediaType;
+  delete legacySanitizedInput.requiredGenres;
+  delete legacySanitizedInput.excludedGenres;
+  assert.equal(
+    await semantic.createInputFingerprint(
+      legacySanitizedInput,
+      initial.continuation.queryVector,
+    ),
+    initial.continuation.inputFingerprint,
+    "등급 상한이 없는 기존 Run의 fingerprint 형식은 유지되어야 한다",
+  );
+  assert.notEqual(
+    await semantic.createInputFingerprint(
+      {
+        ...resolved.sanitizedInput,
+        companions: ["WITH_CHILDREN"],
+        childAgeRatingLimit: "7",
+      },
+      initial.continuation.queryVector,
+    ),
+    initial.continuation.inputFingerprint,
+  );
+  assert.equal(
+    await semantic.createInputFingerprint(
+      { ...resolved.sanitizedInput, mediaType: "ANY" },
+      initial.continuation.queryVector,
+    ),
+    initial.continuation.inputFingerprint,
+    "default ANY는 기존 fingerprint를 바꾸지 않아야 한다",
+  );
+  assert.notEqual(
+    await semantic.createInputFingerprint(
+      { ...resolved.sanitizedInput, mediaType: "MOVIE" },
+      initial.continuation.queryVector,
+    ),
+    initial.continuation.inputFingerprint,
+    "명시적 작품 유형은 continuation fingerprint에 결합되어야 한다",
+  );
+  assert.notEqual(
+    await semantic.createInputFingerprint(
+      { ...resolved.sanitizedInput, excludedGenres: ["공포"] },
+      initial.continuation.queryVector,
+    ),
+    initial.continuation.inputFingerprint,
+    "명시적 제외 장르는 continuation fingerprint에 결합되어야 한다",
+  );
 
   const continuation = await adapter.search(
     {
@@ -346,6 +640,28 @@ test("local search produces deterministic privacy-safe continuation", async () =
       ...initial.continuation.queryVector,
       values: [Number.NaN],
     }),
+  );
+});
+
+test("structured semantic query keeps positive media and required-genre parity", async () => {
+  const request = await loadModule("src/domains/recommendation/request.ts");
+  const query = await loadModule("src/domains/search/query.ts");
+  const resolved = request.resolveMvpRecommendationRequest({
+    choice: {
+      mediaType: "SERIES",
+      desiredGenres: ["드라마"],
+      requiredGenres: ["코미디"],
+      excludedGenres: ["공포"],
+    },
+  });
+  const text = query.buildMvpSearchQuery(resolved.transientInput);
+  assert.match(text, /시리즈/);
+  assert.match(text, /드라마/);
+  assert.match(text, /코미디/);
+  assert.doesNotMatch(
+    text,
+    /공포/,
+    "negative genre tokens must not increase semantic similarity",
   );
 });
 

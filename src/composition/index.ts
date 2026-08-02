@@ -4,9 +4,11 @@ import {
   type MvpAdapterConfig,
 } from "../config/adapters";
 import type { DemoResettable } from "../contracts/mvp-ports";
-import { PipelineRecommendationExecutor } from "../domains/recommendation/executors/pipeline-recommendation-executor";
+import { AgentRecommendationExecutor } from "../domains/recommendation/agent/agent-recommendation-executor";
 import { AnonymousRecommendationOrchestrator } from "../domains/recommendation/orchestrator";
 import { PolicyLayer } from "../domains/recommendation/policy";
+import { createSearchCatalogTool } from "../domains/recommendation/tools/search-catalog-tool";
+import { ToolRegistry } from "../domains/recommendation/tools/tool-registry";
 import { createDemoAdapters, type DemoAdapterSet } from "./demo";
 import { resolveMvpAdapters } from "./live";
 import type {
@@ -57,10 +59,13 @@ export async function createMvpComposition(
   const adapters = resolved.adapters;
 
   try {
-    const executor = new PipelineRecommendationExecutor(
-      adapters.catalog,
-      adapters.search,
+    const tools = new ToolRegistry();
+    tools.register(
+      createSearchCatalogTool(adapters.catalog, adapters.search),
+    );
+    const executor = new AgentRecommendationExecutor(
       adapters.selector,
+      tools,
       {
         executionMode:
           config.selector === "openai" ? "OPENAI" : "DETERMINISTIC",

@@ -1,21 +1,23 @@
+import { AppShell } from "../app-shell";
 import { LandingFeatures } from "./landing-features";
 import { LandingFooter } from "./landing-footer";
 import { LandingHero } from "./landing-hero";
 import { LandingNav } from "./landing-nav";
 import { RecommendationShowcase } from "./recommendation-showcase";
-import { SupportedProviderStrip } from "./supported-provider-strip";
 
 export function LandingPage() {
   return (
-    <div className="cinema-landing min-h-screen overflow-x-clip bg-[#10151b] text-[#f4f7f9] selection:bg-[#ff6b3d] selection:text-white">
-      <LandingNav />
+    <AppShell
+      className="cinema-landing bg-[#10151b]"
+      header={<LandingNav />}
+      contentAsMain={false}
+    >
       <main>
         <LandingHero />
-        <SupportedProviderStrip />
         <RecommendationShowcase />
         <LandingFeatures />
       </main>
       <LandingFooter />
-    </div>
+    </AppShell>
   );
 }

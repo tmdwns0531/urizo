@@ -25,14 +25,14 @@ export function Step3Ott({ otts, onToggleOtt }: Step3OttProps) {
         >
           어느 OTT를 이용하나요?
         </h2>
-        <p id="ott-selection-help" className="text-sm leading-6 text-slate-400 sm:text-base">
+        <p id="ott-selection-help" className="text-base leading-7 text-slate-300">
           구독 중인 OTT를 모두 골라주세요. 최소 1개 이상 선택해야 해요.
         </p>
       </header>
 
       <fieldset aria-describedby="ott-selection-help ott-selection-status">
         <legend className="sr-only">이용 중인 OTT, 필수, 하나 이상 선택</legend>
-        <div className="stepper-option-grid grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <div className="stepper-option-grid grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-6">
           {OTT_OPTIONS.map((option) => {
             const isSelected = otts.includes(option.value);
 
@@ -58,7 +58,7 @@ export function Step3Ott({ otts, onToggleOtt }: Step3OttProps) {
                 </span>
                 <span
                   aria-hidden="true"
-                  className={`absolute right-2.5 top-2.5 flex size-5 items-center justify-center rounded-full border text-xs font-black ${
+                  className={`absolute right-2.5 top-2.5 flex size-6 items-center justify-center rounded-full border text-sm font-black ${
                     isSelected
                       ? "border-orange-400 bg-orange-500 text-white"
                       : "border-slate-700 text-transparent"
@@ -74,7 +74,7 @@ export function Step3Ott({ otts, onToggleOtt }: Step3OttProps) {
 
       <p
         id="ott-selection-status"
-        className={`text-sm ${needsSelection ? "text-orange-400" : "text-slate-500"}`}
+        className={`text-sm leading-6 ${needsSelection ? "text-orange-300" : "text-slate-400"}`}
         aria-live="polite"
       >
         {needsSelection

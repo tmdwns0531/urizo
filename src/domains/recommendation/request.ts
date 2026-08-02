@@ -1,9 +1,13 @@
 import { OTT_PROVIDERS, type OttProvider } from "../../contracts/catalog";
 import type {
+  AgentStructuredRuntimeMinutes,
   Companion,
+  ChildAgeRatingLimit,
+  ChoiceRuntimeMinutes,
   MvpDemoRecommendationRequest,
   MvpDemoScenario,
   MvpRecommendationRequest,
+  MediaTypePreference,
   Mood,
   NaturalLanguage140,
   OriginPreference,
@@ -11,11 +15,12 @@ import type {
   TransientRecommendationSearchInput,
 } from "../../contracts/mvp-search";
 import {
-  CHOICE_RUNTIME_MINUTES,
+  CHILD_AGE_RATING_LIMITS,
   COMPANIONS,
   MVP_DEMO_SCENARIOS,
   MVP_GENRE_MAX_CODE_POINTS,
   MVP_GENRE_MAX_ITEMS,
+  MEDIA_TYPE_PREFERENCES,
   MVP_MOODS,
   NATURAL_LANGUAGE_MAX_CODE_POINTS,
   ORIGIN_PREFERENCES,
@@ -26,6 +31,7 @@ import type {
 } from "../../contracts/recommendation";
 import type { SearchInput } from "../../contracts/search";
 import type { UserContext } from "../../contracts/user";
+import { parseNaturalInput } from "./natural-language/parse-natural-input";
 
 export type MvpRequestProfile = "demo" | "live";
 
@@ -61,7 +67,11 @@ export interface ResolvedMvpRecommendationChoice {
   moods: Mood[];
   desiredGenres: string[];
   companionAvoidGenres: string[];
-  maxRuntimeMinutes: 30 | 60 | 120 | 180 | null;
+  requiredGenres: string[];
+  excludedGenres: string[];
+  mediaType: MediaTypePreference;
+  maxRuntimeMinutes: AgentStructuredRuntimeMinutes;
+  childAgeRatingLimit: ChildAgeRatingLimit | null;
   originPreference: OriginPreference;
   naturalLanguage: NaturalLanguage140;
 }
@@ -90,7 +100,12 @@ const CHOICE_KEYS = [
   "moods",
   "desiredGenres",
   "companionAvoidGenres",
+  "requiredGenres",
+  "excludedGenres",
+  "mediaType",
   "maxRuntimeMinutes",
+  "naturalRuntimeMinutes",
+  "childAgeRatingLimit",
   "originPreference",
   "naturalLanguage",
   "explicitlyRequestedGenres",
@@ -197,6 +212,38 @@ function parseUniqueGenreArray(value: unknown, path: string): string[] {
   return normalized;
 }
 
+function parseNaturalRuntimeMinutes(
+  value: unknown,
+  path: string,
+): AgentStructuredRuntimeMinutes {
+  if (value === null) return null;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 180
+  ) {
+    fail(path, "INVALID_VALUE", "must be null or an integer from 1 to 180");
+  }
+  return value;
+}
+
+function parseChoiceRuntimeMinutes(
+  value: unknown,
+  path: string,
+): ChoiceRuntimeMinutes {
+  if (
+    value === 30 ||
+    value === 60 ||
+    value === 120 ||
+    value === 180 ||
+    value === null
+  ) {
+    return value;
+  }
+  fail(path, "INVALID_VALUE", "must be 30, 60, 120, 180, or null");
+}
+
 const sameSet = (left: readonly string[], right: readonly string[]): boolean => {
   if (left.length !== right.length) return false;
   const sortedLeft = [...left].sort();
@@ -213,104 +260,6 @@ function parseResolvedChoice(
   }
   assertRecord(value, "request.choice");
   assertAllowedKeys(value, CHOICE_KEYS, "request.choice");
-
-  const selectedProviders =
-    value.selectedProviders === undefined
-      ? []
-      : parseUniqueEnumArray(
-          value.selectedProviders,
-          OTT_PROVIDERS,
-          "request.choice.selectedProviders",
-        );
-  const companions =
-    value.companions === undefined
-      ? []
-      : parseUniqueEnumArray(
-          value.companions,
-          COMPANIONS,
-          "request.choice.companions",
-        );
-  if (companions.length > 1) {
-    fail(
-      "request.choice.companions",
-      "CARDINALITY",
-      "must contain at most one value",
-    );
-  }
-
-  const moods =
-    value.moods === undefined
-      ? []
-      : parseUniqueEnumArray(
-          value.moods,
-          MVP_MOODS,
-          "request.choice.moods",
-        );
-  const desiredGenres =
-    value.desiredGenres === undefined
-      ? []
-      : parseUniqueGenreArray(
-          value.desiredGenres,
-          "request.choice.desiredGenres",
-        );
-  const companionAvoidGenres =
-    value.companionAvoidGenres === undefined
-      ? []
-      : parseUniqueGenreArray(
-          value.companionAvoidGenres,
-          "request.choice.companionAvoidGenres",
-        );
-  if (companionAvoidGenres.length > 1) {
-    fail(
-      "request.choice.companionAvoidGenres",
-      "CARDINALITY",
-      "must contain at most one value",
-    );
-  }
-
-  const normalizedCompanions =
-    companions.length === 0 ? (["ANY"] as Companion[]) : companions;
-  if (
-    companionAvoidGenres.length > 0 &&
-    normalizedCompanions[0] !== "PARTNER" &&
-    normalizedCompanions[0] !== "FRIENDS"
-  ) {
-    fail(
-      "request.choice.companionAvoidGenres",
-      "POLICY",
-      "is allowed only with PARTNER or FRIENDS",
-    );
-  }
-
-  let maxRuntimeMinutes: 30 | 60 | 120 | 180 | null = null;
-  if (value.maxRuntimeMinutes !== undefined) {
-    if (
-      !CHOICE_RUNTIME_MINUTES.some(
-        (runtime) => runtime === value.maxRuntimeMinutes,
-      )
-    ) {
-      fail(
-        "request.choice.maxRuntimeMinutes",
-        "INVALID_VALUE",
-        "must be 30, 60, 120, 180, or null",
-      );
-    }
-    maxRuntimeMinutes = value.maxRuntimeMinutes as
-      | 30
-      | 60
-      | 120
-      | 180
-      | null;
-  }
-
-  const originPreference =
-    value.originPreference === undefined
-      ? "ANY"
-      : parseEnum(
-          value.originPreference,
-          ORIGIN_PREFERENCES,
-          "request.choice.originPreference",
-        );
 
   let naturalLanguage = "";
   const naturalLanguageValue = value.naturalLanguage;
@@ -334,6 +283,167 @@ function parseResolvedChoice(
     }
     naturalLanguage = naturalLanguageValue;
   }
+  const parsedNatural = naturalLanguage.trim()
+    ? parseNaturalInput(naturalLanguage)
+    : null;
+
+  const selectedProviders =
+    value.selectedProviders === undefined
+      ? parsedNatural
+        ? [...parsedNatural.providers.value]
+        : []
+      : parseUniqueEnumArray(
+          value.selectedProviders,
+          OTT_PROVIDERS,
+          "request.choice.selectedProviders",
+        );
+  const companions =
+    value.companions === undefined
+      ? parsedNatural
+        ? [parsedNatural.companion.value]
+        : []
+      : parseUniqueEnumArray(
+          value.companions,
+          COMPANIONS,
+          "request.choice.companions",
+        );
+  if (companions.length > 1) {
+    fail(
+      "request.choice.companions",
+      "CARDINALITY",
+      "must contain at most one value",
+    );
+  }
+
+  const moods =
+    value.moods === undefined
+      ? parsedNatural
+        ? [...parsedNatural.moods.value]
+        : []
+      : parseUniqueEnumArray(
+          value.moods,
+          MVP_MOODS,
+          "request.choice.moods",
+        );
+  const desiredGenres =
+    value.desiredGenres === undefined
+      ? parsedNatural
+        ? [...parsedNatural.desiredGenres.value]
+        : []
+      : parseUniqueGenreArray(
+          value.desiredGenres,
+          "request.choice.desiredGenres",
+        );
+  const companionAvoidGenres =
+    value.companionAvoidGenres === undefined
+      ? []
+      : parseUniqueGenreArray(
+          value.companionAvoidGenres,
+          "request.choice.companionAvoidGenres",
+        );
+  if (companionAvoidGenres.length > 1) {
+    fail(
+      "request.choice.companionAvoidGenres",
+      "CARDINALITY",
+      "must contain at most one value",
+    );
+  }
+  const requiredGenres =
+    value.requiredGenres === undefined
+      ? parsedNatural
+        ? [...parsedNatural.requiredGenres.value]
+        : []
+      : parseUniqueGenreArray(
+          value.requiredGenres,
+          "request.choice.requiredGenres",
+        );
+  const excludedGenres =
+    value.excludedGenres === undefined
+      ? parsedNatural
+        ? [...parsedNatural.excludedGenres.value]
+        : []
+      : parseUniqueGenreArray(
+          value.excludedGenres,
+          "request.choice.excludedGenres",
+        );
+  const conflictingGenre = requiredGenres.find((genre) =>
+    excludedGenres.includes(genre),
+  );
+  if (conflictingGenre) {
+    fail(
+      "request.choice.excludedGenres",
+      "POLICY",
+      `must not exclude required genre ${conflictingGenre}`,
+    );
+  }
+
+  const normalizedCompanions: Companion[] =
+    companions.length === 0 ? ["ANY"] : companions;
+  if (
+    companionAvoidGenres.length > 0 &&
+    normalizedCompanions[0] !== "PARTNER" &&
+    normalizedCompanions[0] !== "FRIENDS"
+  ) {
+    fail(
+      "request.choice.companionAvoidGenres",
+      "POLICY",
+      "is allowed only with PARTNER or FRIENDS",
+    );
+  }
+
+  const choiceRuntimeMinutes =
+    value.maxRuntimeMinutes === undefined
+      ? null
+      : parseChoiceRuntimeMinutes(
+          value.maxRuntimeMinutes,
+          "request.choice.maxRuntimeMinutes",
+        );
+  const maxRuntimeMinutes: AgentStructuredRuntimeMinutes =
+    value.naturalRuntimeMinutes !== undefined
+      ? parseNaturalRuntimeMinutes(
+          value.naturalRuntimeMinutes,
+          "request.choice.naturalRuntimeMinutes",
+        )
+      : value.maxRuntimeMinutes !== undefined
+        ? choiceRuntimeMinutes
+        : (parsedNatural?.runtimeMinutes.value ?? null);
+
+  const childAgeRatingLimit =
+    value.childAgeRatingLimit === undefined || value.childAgeRatingLimit === null
+      ? null
+      : parseEnum(
+          value.childAgeRatingLimit,
+          CHILD_AGE_RATING_LIMITS,
+          "request.choice.childAgeRatingLimit",
+        );
+  if (
+    childAgeRatingLimit !== null &&
+    normalizedCompanions[0] !== "WITH_CHILDREN"
+  ) {
+    fail(
+      "request.choice.childAgeRatingLimit",
+      "POLICY",
+      "is allowed only with WITH_CHILDREN",
+    );
+  }
+
+  const mediaType =
+    value.mediaType === undefined
+      ? (parsedNatural?.mediaType.value ?? "ANY")
+      : parseEnum(
+          value.mediaType,
+          MEDIA_TYPE_PREFERENCES,
+          "request.choice.mediaType",
+        );
+
+  const originPreference =
+    value.originPreference === undefined
+      ? (parsedNatural?.origin.value ?? "ANY")
+      : parseEnum(
+          value.originPreference,
+          ORIGIN_PREFERENCES,
+          "request.choice.originPreference",
+        );
 
   if (value.explicitlyRequestedGenres !== undefined) {
     const explicit = parseUniqueGenreArray(
@@ -356,7 +466,11 @@ function parseResolvedChoice(
     moods.length === 0 &&
     desiredGenres.length === 0 &&
     companionAvoidGenres.length === 0 &&
+    requiredGenres.length === 0 &&
+    excludedGenres.length === 0 &&
+    mediaType === "ANY" &&
     maxRuntimeMinutes === null &&
+    childAgeRatingLimit === null &&
     originPreference === "ANY" &&
     naturalLanguage.trim().length === 0
   ) {
@@ -376,7 +490,11 @@ function parseResolvedChoice(
     moods,
     desiredGenres,
     companionAvoidGenres,
+    requiredGenres,
+    excludedGenres,
+    mediaType,
     maxRuntimeMinutes,
+    childAgeRatingLimit,
     originPreference,
     naturalLanguage,
   };
@@ -443,6 +561,8 @@ export function toMvpSearchInput(
     moods: [...sanitized.moods],
     desiredGenres: [...sanitized.desiredGenres],
     companionAvoidGenres: [...sanitized.companionAvoidGenres],
+    requiredGenres: [...sanitized.requiredGenres],
+    excludedGenres: [...sanitized.excludedGenres],
     hasNaturalLanguage: naturalLanguage.trim().length > 0,
     naturalLanguage,
   };
@@ -457,7 +577,11 @@ export function sanitizeMvpSearchInput(
     moods: [...input.moods],
     desiredGenres: [...input.desiredGenres],
     companionAvoidGenres: [...input.companionAvoidGenres],
+    requiredGenres: [...(input.requiredGenres ?? [])],
+    excludedGenres: [...(input.excludedGenres ?? [])],
+    mediaType: input.mediaType ?? "ANY",
     maxRuntimeMinutes: input.maxRuntimeMinutes,
+    childAgeRatingLimit: input.childAgeRatingLimit ?? null,
     originPreference: input.originPreference,
     hasNaturalLanguage: input.hasNaturalLanguage,
   };

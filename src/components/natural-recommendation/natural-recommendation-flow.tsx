@@ -3,21 +3,20 @@
 import { useEffect, useReducer, useRef } from "react";
 import type {
   MvpApprovalDecision,
+  MvpClarificationAnswer,
   MvpRecommendationResponse,
 } from "../../contracts/mvp-recommendation";
-import type {
-  ChildAge,
-  FamilyType,
-} from "../choice-stepper/choice-types";
-import { NaturalAgeStep } from "./natural-age-step";
+import { toAnonymousAdContext } from "../advertising/sponsored-video-ad";
+import { AppShell } from "../app-shell";
+import { buildRecommendationRequest } from "../choice-stepper/choice-state";
 import { NaturalInputStep } from "./natural-input-step";
 import {
   buildNaturalRecommendationRequest,
-  hasExplicitChildKeyword,
+  clarificationAnswerToNaturalFamily,
   interpretNaturalRequest,
-  type NaturalFamilyClarification,
   type NaturalInterpretation,
-  requiresAgeClarification,
+  type NaturalInterpretationOverrideChange,
+  type NaturalInterpretationOverrides,
 } from "./natural-language";
 import {
   NaturalLoadingStep,
@@ -28,7 +27,6 @@ import { NaturalRecommendationResult } from "./natural-result";
 
 export type NaturalFlowStep =
   | "input"
-  | "clarify_age"
   | "analyzing"
   | "matching"
   | "result";
@@ -36,36 +34,39 @@ export type NaturalFlowStep =
 type NaturalFlowState = {
   step: NaturalFlowStep;
   input: string;
-  familyType: FamilyType | null;
-  childAge: ChildAge | null;
+  overrides: NaturalInterpretationOverrides;
   interpretation: NaturalInterpretation | null;
   response: MvpRecommendationResponse | null;
   error: string;
-  deciding: MvpApprovalDecision | null;
+  deciding: MvpApprovalDecision | MvpClarificationAnswer | null;
   decisionError: string;
 };
 
 type NaturalFlowAction =
   | { type: "SET_INPUT"; value: string }
+  | { type: "SET_OVERRIDE"; change: NaturalInterpretationOverrideChange }
   | { type: "SHOW_INPUT" }
-  | { type: "SHOW_CLARIFICATION"; familyType: FamilyType | null }
-  | { type: "SET_FAMILY_TYPE"; value: FamilyType }
-  | { type: "SET_CHILD_AGE"; value: ChildAge }
   | { type: "VALIDATION_ERROR"; value: string }
   | { type: "START_REQUEST"; interpretation: NaturalInterpretation }
   | { type: "SHOW_MATCHING" }
   | { type: "SHOW_RESULT"; response: MvpRecommendationResponse }
   | { type: "REQUEST_ERROR"; value: string }
-  | { type: "START_DECISION"; decision: MvpApprovalDecision }
-  | { type: "DECISION_RESULT"; response: MvpRecommendationResponse }
+  | {
+      type: "START_DECISION";
+      decision: MvpApprovalDecision | MvpClarificationAnswer;
+    }
+  | {
+      type: "DECISION_RESULT";
+      response: MvpRecommendationResponse;
+      interpretation?: NaturalInterpretation;
+    }
   | { type: "DECISION_ERROR"; value: string }
   | { type: "RESET" };
 
 const INITIAL_NATURAL_FLOW_STATE: NaturalFlowState = {
   step: "input",
   input: "",
-  familyType: null,
-  childAge: null,
+  overrides: {},
   interpretation: null,
   response: null,
   error: "",
@@ -79,7 +80,39 @@ function naturalFlowReducer(
 ): NaturalFlowState {
   switch (action.type) {
     case "SET_INPUT":
-      return { ...state, input: action.value, error: "" };
+      return {
+        ...state,
+        input: action.value,
+        overrides: {},
+        error: "",
+      };
+    case "SET_OVERRIDE": {
+      const overrides = { ...state.overrides };
+      switch (action.change.dimension) {
+        case "who":
+          overrides.who = action.change.value;
+          break;
+        case "mediaType":
+          overrides.mediaType = action.change.value;
+          break;
+        case "runtimeMinutes":
+          overrides.runtimeMinutes = action.change.value;
+          break;
+        case "providers":
+          overrides.providers = [...action.change.value];
+          break;
+        case "mood":
+          overrides.mood = action.change.value;
+          break;
+        case "origin":
+          overrides.origin = action.change.value;
+          break;
+        case "genres":
+          overrides.genres = [...action.change.value];
+          break;
+      }
+      return { ...state, overrides, error: "" };
+    }
     case "SHOW_INPUT":
       return {
         ...state,
@@ -90,23 +123,6 @@ function naturalFlowReducer(
         deciding: null,
         decisionError: "",
       };
-    case "SHOW_CLARIFICATION":
-      return {
-        ...state,
-        step: "clarify_age",
-        familyType: action.familyType,
-        childAge: action.familyType === "KIDS" ? state.childAge : null,
-        error: "",
-      };
-    case "SET_FAMILY_TYPE":
-      return {
-        ...state,
-        familyType: action.value,
-        childAge: action.value === "KIDS" ? state.childAge : null,
-        error: "",
-      };
-    case "SET_CHILD_AGE":
-      return { ...state, childAge: action.value, error: "" };
     case "VALIDATION_ERROR":
       return { ...state, error: action.value };
     case "START_REQUEST":
@@ -142,6 +158,7 @@ function naturalFlowReducer(
       return {
         ...state,
         response: action.response,
+        interpretation: action.interpretation ?? state.interpretation,
         deciding: null,
         decisionError: "",
       };
@@ -150,12 +167,6 @@ function naturalFlowReducer(
     case "RESET":
       return INITIAL_NATURAL_FLOW_STATE;
   }
-}
-
-function wait(milliseconds: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
 }
 
 function isRecommendationResponse(
@@ -180,6 +191,12 @@ async function readRecommendationResponse(response: Response) {
   return result;
 }
 
+function isClarificationAnswer(
+  value: MvpApprovalDecision | MvpClarificationAnswer,
+): value is MvpClarificationAnswer {
+  return value !== "approve" && value !== "reject";
+}
+
 export function NaturalRecommendationFlow() {
   const [state, dispatch] = useReducer(
     naturalFlowReducer,
@@ -199,12 +216,28 @@ export function NaturalRecommendationFlow() {
   }
 
   async function startRecommendation(
-    clarification?: NaturalFamilyClarification,
+    requestedOverrides: NaturalInterpretationOverrides = state.overrides,
   ) {
     const input = state.input.trim();
+    const previousDraft = state.interpretation?.draft;
+    const previousClarification =
+      previousDraft?.familyType === "ADULTS" ||
+      (previousDraft?.familyType === "KIDS" && previousDraft.childAge !== null)
+        ? {
+            familyType: previousDraft.familyType,
+            childAge:
+              previousDraft.familyType === "KIDS"
+                ? previousDraft.childAge
+                : null,
+          }
+        : undefined;
     let interpretation: NaturalInterpretation;
     try {
-      interpretation = interpretNaturalRequest(input, clarification);
+      interpretation = interpretNaturalRequest(
+        input,
+        previousClarification,
+        requestedOverrides,
+      );
     } catch (error) {
       dispatch({
         type: "VALIDATION_ERROR",
@@ -239,11 +272,11 @@ export function NaturalRecommendationFlow() {
     const isActive = () =>
       requestSequence.current === requestId && !controller.signal.aborted;
 
-    await wait(900);
-    if (!isActive()) return;
-    dispatch({ type: "SHOW_MATCHING" });
-
-    const [outcome] = await Promise.all([requestOutcome, wait(1_100)]);
+    const matchingTimer = window.setTimeout(() => {
+      if (isActive()) dispatch({ type: "SHOW_MATCHING" });
+    }, 650);
+    const outcome = await requestOutcome;
+    window.clearTimeout(matchingTimer);
     if (!isActive()) return;
 
     if (!outcome.ok) {
@@ -278,34 +311,25 @@ export function NaturalRecommendationFlow() {
       });
       return;
     }
-    if (requiresAgeClarification(input)) {
-      dispatch({
-        type: "SHOW_CLARIFICATION",
-        familyType: hasExplicitChildKeyword(input) ? "KIDS" : null,
-      });
-      return;
-    }
     void startRecommendation();
   }
 
-  function submitClarification() {
-    if (!state.familyType) {
-      dispatch({ type: "VALIDATION_ERROR", value: "함께 보는 가족 구성을 선택해 주세요." });
-      return;
-    }
-    if (state.familyType === "KIDS" && !state.childAge) {
-      dispatch({ type: "VALIDATION_ERROR", value: "아이와 볼 수 있는 관람 등급을 선택해 주세요." });
-      return;
-    }
-    void startRecommendation({
-      familyType: state.familyType,
-      childAge: state.familyType === "KIDS" ? state.childAge : null,
-    });
-  }
-
-  async function decideApproval(decision: MvpApprovalDecision) {
+  async function decideApproval(
+    decision: MvpApprovalDecision | MvpClarificationAnswer,
+  ) {
     const response = state.response;
     if (response?.status !== "awaiting_approval" || state.deciding) return;
+    const clarificationAnswer = isClarificationAnswer(decision)
+      ? decision
+      : null;
+    if (
+      (response.proposal.kind === "FAMILY_COMPOSITION" &&
+        clarificationAnswer === null) ||
+      (response.proposal.kind === "RUNTIME_RELAXATION" &&
+        clarificationAnswer !== null)
+    ) {
+      return;
+    }
     dispatch({ type: "START_DECISION", decision });
     try {
       const request = await fetch(
@@ -313,11 +337,30 @@ export function NaturalRecommendationFlow() {
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify(
+            clarificationAnswer
+              ? {
+                  answer: clarificationAnswer,
+                  naturalLanguage: state.input.trim(),
+                }
+              : { decision },
+          ),
         },
       );
       const result = await readRecommendationResponse(request);
-      dispatch({ type: "DECISION_RESULT", response: result });
+      const interpretation =
+        clarificationAnswer
+          ? interpretNaturalRequest(
+              state.input,
+              clarificationAnswerToNaturalFamily(clarificationAnswer),
+              state.overrides,
+            )
+          : undefined;
+      dispatch({
+        type: "DECISION_RESULT",
+        response: result,
+        ...(interpretation ? { interpretation } : {}),
+      });
     } catch (error) {
       dispatch({
         type: "DECISION_ERROR",
@@ -348,41 +391,57 @@ export function NaturalRecommendationFlow() {
     state.step === "analyzing" || state.step === "matching"
       ? (state.step as NaturalLoadingStepName)
       : null;
+  let inputInterpretation: NaturalInterpretation | null = null;
+  if (state.step === "input" && state.input.trim()) {
+    try {
+      inputInterpretation = interpretNaturalRequest(
+        state.input,
+        undefined,
+        state.overrides,
+      );
+    } catch {
+      inputInterpretation = null;
+    }
+  }
 
   return (
-    <div
-      className="choice-stepper-page flex min-h-dvh flex-col"
-      data-natural-flow-step={state.step}
+    <AppShell
+      className="choice-stepper-page"
+      header={
+        <NaturalRecommendationNav
+          dirty={Boolean(state.input.trim())}
+          onReset={confirmAndReset}
+        />
+      }
+      contentAsMain={false}
+      naturalFlowStep={state.step}
     >
-      <NaturalRecommendationNav
-        dirty={Boolean(state.input.trim())}
-        onReset={confirmAndReset}
-      />
-
       {state.step === "input" ? (
         <NaturalInputStep
           value={state.input}
+          interpretation={inputInterpretation}
+          overrides={state.overrides}
           error={state.error}
           onChange={(value) => dispatch({ type: "SET_INPUT", value })}
+          onOverrideChange={(change) =>
+            dispatch({ type: "SET_OVERRIDE", change })
+          }
           onSubmit={submitInput}
         />
       ) : null}
 
-      {state.step === "clarify_age" ? (
-        <NaturalAgeStep
-          familyType={state.familyType}
-          childAge={state.childAge}
-          error={state.error}
-          onFamilyTypeChange={(value) =>
-            dispatch({ type: "SET_FAMILY_TYPE", value })
+      {loadingStep ? (
+        <NaturalLoadingStep
+          step={loadingStep}
+          context={
+            state.interpretation
+              ? toAnonymousAdContext(
+                  buildRecommendationRequest(state.interpretation.draft).choice,
+                )
+              : undefined
           }
-          onChildAgeChange={(value) => dispatch({ type: "SET_CHILD_AGE", value })}
-          onPrevious={() => dispatch({ type: "SHOW_INPUT" })}
-          onSubmit={submitClarification}
         />
       ) : null}
-
-      {loadingStep ? <NaturalLoadingStep step={loadingStep} /> : null}
 
       {state.step === "result" && state.response && state.interpretation ? (
         <NaturalRecommendationResult
@@ -391,17 +450,18 @@ export function NaturalRecommendationFlow() {
           deciding={state.deciding}
           decisionError={state.decisionError}
           onDecision={(decision) => void decideApproval(decision)}
-          onSameConditions={() =>
-            void startRecommendation(
-              requiresAgeClarification(state.input)
-                ? {
-                    familyType: state.familyType ?? "ADULTS",
-                    childAge:
-                      state.familyType === "KIDS" ? state.childAge : null,
-                  }
-                : undefined,
-            )
-          }
+          onSameConditions={() => void startRecommendation()}
+          onAllowAnyMediaType={() => {
+            const overrides: NaturalInterpretationOverrides = {
+              ...state.overrides,
+              mediaType: "ANY",
+            };
+            dispatch({
+              type: "SET_OVERRIDE",
+              change: { dimension: "mediaType", value: "ANY" },
+            });
+            void startRecommendation(overrides);
+          }}
           onEditInput={() => {
             cancelActiveRequest();
             dispatch({ type: "SHOW_INPUT" });
@@ -409,6 +469,6 @@ export function NaturalRecommendationFlow() {
           onReset={resetFlow}
         />
       ) : null}
-    </div>
+    </AppShell>
   );
 }

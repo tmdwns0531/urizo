@@ -12,6 +12,7 @@ import {
   RECOMMENDATION_WEIGHTS,
   type RecommendationWeights,
 } from "../../config/recommendation";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 
@@ -154,7 +155,7 @@ function buildMvpReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /**
@@ -267,7 +268,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /** @deprecated Use scoreMvpSearchResults for anonymous MVP code. */

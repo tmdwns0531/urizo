@@ -3,7 +3,7 @@ import type { BudgetCounter } from "../budget";
 export interface RegisteredTool<TInput = unknown, TOutput = unknown> {
   name: string;
   description: string;
-  execute(input: TInput): Promise<TOutput>;
+  execute(input: TInput, signal?: AbortSignal): Promise<TOutput>;
 }
 
 export interface ToolDescriptor {
@@ -55,8 +55,8 @@ export class ToolRegistry {
     if (!tool) {
       throw new Error(`Tool "${name}" is not registered.`);
     }
-    return budget.runTool(async () =>
-      (await tool.execute(input)) as TOutput,
+    return budget.runTool(async (signal) =>
+      (await tool.execute(input, signal)) as TOutput,
     );
   }
 }

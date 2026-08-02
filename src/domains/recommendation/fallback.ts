@@ -16,6 +16,7 @@ import type {
 import { RESULT_LIMIT } from "../../config/recommendation";
 import { filterMvpCatalog } from "../catalog/filtering";
 import type { ExecutionAttempt } from "./executors/types";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number =>
   Math.max(0, Math.min(1, value));
@@ -101,7 +102,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 기대치가 높아요.");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 function scoreEligibleCatalog(

@@ -14,7 +14,7 @@ export function ProgressBar({ currentStep }: ProgressBarProps) {
   return (
     <div className="choice-stepper-progress-shell">
       <div
-        className="choice-stepper-progress"
+        className="app-container choice-stepper-progress"
         role="progressbar"
         aria-label="조건 선택 진행률"
         aria-valuemin={1}

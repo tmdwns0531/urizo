@@ -6,6 +6,9 @@ import {
   snapshotChoiceHandoffDraft,
   useChoiceHandoff,
 } from "../choice-handoff/choice-handoff-provider";
+import { RecommendationWaitingScreen } from "../advertising/recommendation-waiting-screen";
+import { AppShell } from "../app-shell";
+import { toAnonymousAdContext } from "../advertising/sponsored-video-ad";
 import { ChoiceNav } from "./choice-nav";
 import {
   buildRecommendationRequest,
@@ -164,8 +167,32 @@ export function ChoiceStepper() {
     }
   }
 
+  if (isSubmitting) {
+    return (
+      <AppShell
+        className="choice-stepper-page"
+        header={<ChoiceNav dirty={dirty} />}
+        contentAsMain={false}
+      >
+        <main className="flex flex-1">
+          <RecommendationWaitingScreen
+            stage={1}
+            theme="dark"
+            context={toAnonymousAdContext(
+              buildRecommendationRequest(state).choice,
+            )}
+          />
+        </main>
+      </AppShell>
+    );
+  }
+
   return (
-    <div className="choice-stepper-page">
+    <AppShell
+      className="choice-stepper-page"
+      header={<ChoiceNav dirty={dirty} />}
+      contentAsMain={false}
+    >
       <form
         id="choice-form"
         className="choice-stepper-form"
@@ -180,10 +207,9 @@ export function ChoiceStepper() {
           void submitRecommendation();
         }}
       >
-        <ChoiceNav dirty={dirty} />
         <ProgressBar currentStep={currentStep} />
 
-        <main className="choice-stepper-main">
+        <main className="app-container choice-stepper-main">
           <h1 className="sr-only">OTT 다모아 조건 선택</h1>
           <p className="sr-only" aria-live="polite">
             6단계 중 {currentStep}단계입니다.
@@ -275,6 +301,6 @@ export function ChoiceStepper() {
           onNext={goNext}
         />
       </form>
-    </div>
+    </AppShell>
   );
 }
