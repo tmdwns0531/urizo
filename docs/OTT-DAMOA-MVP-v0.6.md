@@ -6,6 +6,12 @@
 - 기준 문서: `ott-damoa-mvp-v0.5(기술스택 반영).md`
 - 적용 우선순위: 이 문서 > `docs/ARCHITECTURE.md`·`docs/TEAM-OWNERSHIP.md` > v0.5
 
+> **v0.9 supersession note (2026-08-03):** 이 문서는 credential-free Demo의
+> 역사적 제품 기준선이다. 현재 구현은 자연어/bounded Agent, 최대 5개 결과,
+> 아이 동반 `ALL|7|12|15` 최대 허용 등급, six-model LIVE schema를 추가했다.
+> as-is 동작과 review 경계는 active code, `docs/ARCHITECTURE.md`,
+> `docs/V09-DEV-REVIEW-READINESS.md`를 우선한다.
+
 ---
 
 ## 0. v0.6 개정 목적
