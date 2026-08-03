@@ -10,6 +10,7 @@
     "dev": "vinext dev",
     "dev:live": "node scripts/prisma-generate.mjs && node scripts/run-live-dev.mjs",
     "postinstall": "node scripts/prisma-generate.mjs",
+    "setup:env": "node scripts/setup-env.mjs",
     "prebuild": "node scripts/prisma-generate.mjs",
     "build": "vinext build",
     "start": "vinext start",

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LogoutButton } from "../watchlist/logout-button";
 import { useWatchlist } from "../watchlist/watchlist-store";
 
 const ITEM =
@@ -49,6 +50,10 @@ export function LandingAuth() {
       </Link>
       <span className="h-5 w-px bg-white/25" aria-hidden="true" />
       <span className={`${ITEM} text-slate-400`}>{account.nickname}님</span>
+      <span className="h-5 w-px bg-white/25" aria-hidden="true" />
+      {/* 별명은 눌리지 않는 글자다. 그 옆에 로그아웃을 함께 두지 않으면
+          로그아웃하려고 별명을 눌러 보다 아무 반응이 없는 채로 끝난다. */}
+      <LogoutButton className="px-2 text-slate-200 hover:text-white sm:px-3" />
     </div>
   );
 }

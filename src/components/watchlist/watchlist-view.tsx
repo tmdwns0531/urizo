@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { buildCoveragePlan } from "@/domains/watchlist/coverage";
 import { providerLabels } from "../provider-badge";
+import { LogoutButton } from "./logout-button";
 import { useWatchlist } from "./watchlist-store";
 
 const percent = (part: number, whole: number): number =>
   whole === 0 ? 0 : Math.round((part / whole) * 100);
 
 export function WatchlistView() {
-  const { account, entries, remove, clear, logout, loading } = useWatchlist();
+  const { account, entries, remove, clear, loading } = useWatchlist();
   const plan = buildCoveragePlan(entries);
 
   // 첫 조회가 끝나기 전에는 아무 상태도 단정하지 않는다. 로그인했는데
@@ -54,12 +55,17 @@ export function WatchlistView() {
           보고 싶은 작품을 찜해 두면, 어느 OTT를 구독해야 가장 많이 볼 수 있는지
           알려드려요.
         </p>
-        <Link
-          href="/choice"
-          className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#ff6b3d] px-6 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-[#ff7d56] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-        >
-          추천받으러 가기
-        </Link>
+        {/* 이 화면은 찜이 0편이면 아래 헤더까지 가지 않고 여기서 끝난다. 그래서
+            로그아웃을 헤더에만 두면 방금 가입한 사람이 빠져나갈 길이 없어진다. */}
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <Link
+            href="/choice"
+            className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#ff6b3d] px-6 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-[#ff7d56] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            추천받으러 가기
+          </Link>
+          <LogoutButton />
+        </div>
       </section>
     );
   }
@@ -87,13 +93,7 @@ export function WatchlistView() {
           >
             전체 비우기
           </button>
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center rounded-full border border-white/15 px-4 text-sm font-bold text-slate-300 transition hover:border-white/30 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
-            onClick={() => void logout()}
-          >
-            로그아웃
-          </button>
+          <LogoutButton />
         </div>
       </header>
 
