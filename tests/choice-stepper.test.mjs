@@ -384,6 +384,7 @@ test("the strict recommendation payload maps form state and omits unsupported ch
     otts: ["NETFLIX", "TVING"],
     mood: "긴장감 있는",
     origin: "KR",
+    mediaType: null,
     genres: ["SF/판타지", "공포/스릴러"],
   });
   assert.deepEqual(request, {
@@ -394,6 +395,7 @@ test("the strict recommendation payload maps form state and omits unsupported ch
       maxRuntimeMinutes: 120,
       childAgeRatingLimit: "15",
       originPreference: "KR",
+      mediaType: "ANY",
       desiredGenres: ["SF", "판타지", "공포", "스릴러"],
       explicitlyRequestedGenres: ["SF", "판타지", "공포", "스릴러"],
       companionAvoidGenres: [],
@@ -474,4 +476,57 @@ test("starting over forces a fresh route load after confirmation", async () => {
   );
   assert.ok(navigation.includes('window.location.assign("/choice")'));
   assert.ok(navigation.includes("function restartChoice"));
+});
+
+test("Step 5 collects an optional media type and maps it to the strict payload", async () => {
+  const [choice, options] = await Promise.all([
+    loadModule("src/components/choice-stepper/choice-state.ts"),
+    loadModule("src/components/choice-stepper/choice-options.ts"),
+  ]);
+
+  assert.deepEqual(
+    options.MEDIA_TYPE_OPTIONS.map((option) => option.value),
+    ["MOVIE", "SERIES", "ANY"],
+  );
+  assert.equal(choice.INITIAL_CHOICE_STATE.mediaType, null);
+
+  const selected = choice.choiceReducer(choice.INITIAL_CHOICE_STATE, {
+    type: "SET_MEDIA_TYPE",
+    value: "SERIES",
+  });
+  assert.equal(selected.mediaType, "SERIES");
+  assert.equal(choice.isChoiceDraftDirty(selected), true);
+  assert.equal(
+    choice.buildRecommendationRequest(selected).choice.mediaType,
+    "SERIES",
+  );
+
+  // Step 5 stays optional: an untouched media type must not narrow results.
+  assert.equal(
+    choice.buildRecommendationRequest(choice.INITIAL_CHOICE_STATE).choice
+      .mediaType,
+    "ANY",
+  );
+});
+
+test("the media type survives the natural-language handoff into Choice", async () => {
+  const natural = await loadModule(
+    "src/components/natural-recommendation/natural-language.ts",
+  );
+
+  const interpretation = natural.interpretNaturalRequest(
+    "주말에 볼 시리즈 추천해줘",
+  );
+  assert.equal(interpretation.draft.mediaType, "SERIES");
+  assert.equal(
+    natural.toChoiceHandoffDraft(interpretation).mediaType,
+    "SERIES",
+  );
+
+  // The handoff snapshot is an explicit allowlist, so a dropped field would be
+  // silent at runtime. Assert on the source that it copies the media type.
+  const handoff = await readSource(
+    "src/components/choice-handoff/choice-handoff-provider.tsx",
+  );
+  assert.match(handoff, /mediaType:\s*draft\.mediaType/);
 });

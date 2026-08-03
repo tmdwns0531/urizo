@@ -42,6 +42,7 @@ export function snapshotChoiceHandoffDraft(
     otts: [...draft.otts],
     mood: draft.mood,
     origin: draft.origin,
+    mediaType: draft.mediaType,
     genres: [...draft.genres],
   };
 }

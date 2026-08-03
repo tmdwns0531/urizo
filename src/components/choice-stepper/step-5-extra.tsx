@@ -1,16 +1,25 @@
-import type { OriginPreference } from "@/contracts/mvp-search";
-import { GENRE_OPTIONS, ORIGIN_OPTIONS } from "./choice-options";
+import type {
+  MediaTypePreference,
+  OriginPreference,
+} from "@/contracts/mvp-search";
+import {
+  GENRE_OPTIONS,
+  MEDIA_TYPE_OPTIONS,
+  ORIGIN_OPTIONS,
+} from "./choice-options";
 import type { ChoiceFormState, GenreChoice } from "./choice-types";
 
 type Step5ExtraProps = {
   state: ChoiceFormState;
   onOriginChange: (value: OriginPreference) => void;
+  onMediaTypeChange: (value: MediaTypePreference) => void;
   onToggleGenre: (value: GenreChoice) => void;
 };
 
 export function Step5Extra({
   state,
   onOriginChange,
+  onMediaTypeChange,
   onToggleGenre,
 }: Step5ExtraProps) {
   return (
@@ -35,7 +44,41 @@ export function Step5Extra({
         </p>
       </header>
 
-      <div className="space-y-8 rounded-2xl border border-slate-800 bg-[#191d22] p-5 sm:p-8">
+      {/* `space-y-*` cannot separate these groups: the unlayered
+          `fieldset { margin: 0 }` reset in globals.css outranks any layered
+          margin utility. Flex `gap` is unaffected by that reset. */}
+      <div className="flex flex-col gap-8 rounded-2xl border border-slate-800 bg-[#191d22] p-5 sm:p-8">
+        <fieldset>
+          <legend className="mb-3 text-sm font-bold text-slate-300">
+            작품 유형 <span className="sr-only">선택 사항</span>
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {MEDIA_TYPE_OPTIONS.map((option) => {
+              const isSelected = state.mediaType === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={`cursor-pointer rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-orange-400 ${
+                    isSelected
+                      ? "border-orange-500 bg-orange-500/15 text-orange-300"
+                      : "border-slate-700 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  <input
+                    className="sr-only"
+                    type="radio"
+                    name="mediaType"
+                    value={option.value}
+                    checked={isSelected}
+                    onChange={() => onMediaTypeChange(option.value)}
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <fieldset>
           <legend className="mb-3 text-sm font-bold text-slate-300">
             작품 제작 지역 <span className="sr-only">선택 사항</span>

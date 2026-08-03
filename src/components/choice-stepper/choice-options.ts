@@ -1,6 +1,7 @@
 import type { OttProvider } from "@/contracts/catalog";
 import type {
   ChoiceRuntimeMinutes,
+  MediaTypePreference,
   OriginPreference,
 } from "@/contracts/mvp-search";
 import type {
@@ -129,6 +130,16 @@ export const ORIGIN_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "KR", label: "한국 작품", hint: "공동 제작 포함" },
   { value: "NON_KR", label: "해외 작품", hint: "한국 외 제작" },
+  { value: "ANY", label: "상관없음", hint: "모두 보기" },
+];
+
+export const MEDIA_TYPE_OPTIONS: ReadonlyArray<{
+  value: MediaTypePreference;
+  label: string;
+  hint: string;
+}> = [
+  { value: "MOVIE", label: "영화", hint: "한 편으로 끝나요" },
+  { value: "SERIES", label: "시리즈", hint: "회차로 이어져요" },
   { value: "ANY", label: "상관없음", hint: "모두 보기" },
 ];
 

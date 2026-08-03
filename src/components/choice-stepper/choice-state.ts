@@ -1,6 +1,7 @@
 import type { OttProvider } from "@/contracts/catalog";
 import type {
   ChildAgeRatingLimit,
+  MediaTypePreference,
   MvpRecommendationRequest,
   OriginPreference,
 } from "@/contracts/mvp-search";
@@ -22,6 +23,7 @@ export const INITIAL_CHOICE_STATE: ChoiceFormState = {
   otts: [],
   mood: null,
   origin: null,
+  mediaType: null,
   genres: [],
 };
 
@@ -33,6 +35,7 @@ export type ChoiceAction =
   | { type: "TOGGLE_OTT"; value: OttProvider }
   | { type: "SET_MOOD"; value: MoodChoice }
   | { type: "SET_ORIGIN"; value: OriginPreference }
+  | { type: "SET_MEDIA_TYPE"; value: MediaTypePreference }
   | { type: "TOGGLE_GENRE"; value: GenreChoice };
 
 export function choiceReducer(
@@ -68,6 +71,8 @@ export function choiceReducer(
       return { ...state, mood: action.value };
     case "SET_ORIGIN":
       return { ...state, origin: action.value };
+    case "SET_MEDIA_TYPE":
+      return { ...state, mediaType: action.value };
     case "TOGGLE_GENRE":
       if (state.genres.includes(action.value)) {
         return {
@@ -149,6 +154,7 @@ export type ChoiceDraftPayload = Pick<
   | "otts"
   | "mood"
   | "origin"
+  | "mediaType"
   | "genres"
 >;
 
@@ -164,6 +170,7 @@ export function buildChoiceDraftPayload(
     otts: [...state.otts],
     mood: state.mood,
     origin: state.origin,
+    mediaType: state.mediaType,
     genres: [...state.genres],
   };
 }
@@ -212,6 +219,7 @@ export function buildRecommendationRequest(
           ? childAgeToRatingLimit(draft.childAge)
           : null,
       originPreference: draft.origin ?? "ANY",
+      mediaType: draft.mediaType ?? "ANY",
       desiredGenres,
       explicitlyRequestedGenres: desiredGenres,
       companionAvoidGenres: [],
@@ -228,6 +236,7 @@ export function isChoiceDraftDirty(state: ChoiceFormState): boolean {
     state.otts.length > 0 ||
     state.mood !== null ||
     state.origin !== null ||
+    state.mediaType !== null ||
     state.genres.length > 0
   );
 }
