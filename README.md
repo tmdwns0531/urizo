@@ -82,9 +82,12 @@ OpenAI selector가 실패하면 필수 정책을 완화하지 않는 결정론�
 |---|---|
 | Prisma runtime | `DATABASE_URL` |
 | Prisma migration | `DATABASE_URL`, `DIRECT_URL` |
+| 계정 세션 (로그인·찜) | `SESSION_SECRET` |
 | OpenAI selector | `OPENAI_API_KEY`, `OPENAI_GENERATION_MODEL` |
 | pgvector search | `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, `OPENAI_EMBEDDING_DIMENSIONS=1536` |
 | TMDB ingestion | `TMDB_API_KEY` |
+
+`SESSION_SECRET`은 LIVE에서 선택이 아니라 필수입니다. 값이 없으면 계정 API가 기동을 거부하고 회원가입·로그인이 500으로 실패합니다. 기본값으로 서명하면 그 키가 저장소에 공개되어 누구나 남의 세션을 위조할 수 있기 때문에, 조용히 뚫려 있는 대신 뜨지 않도록 했습니다. 값은 각자 만들며 서로 같을 필요가 없습니다. Demo는 프로세스마다 임시 키를 만들어 쓰므로 설정하지 않아도 됩니다.
 
 기본 모델 설정은 `gpt-5.6-terra`, `text-embedding-3-small`, 1536차원입니다. 선택한 adapter에 필요한 변수만 검증하며 Prisma-only runtime에는 Supabase anon key나 service-role key가 필요하지 않습니다.
 
