@@ -14,6 +14,8 @@ const landingFiles = [
   "landing-features.tsx",
   "landing-footer.tsx",
   "landing-data.ts",
+  // 다른 검사들이 이 배열을 순서대로 구조분해한다. 새 파일은 뒤에만 붙인다.
+  "landing-auth.tsx",
 ];
 
 async function read(relativePath) {
@@ -141,27 +143,41 @@ test("landing copy matches the actual Choice flow and user perspective", async (
   }
 });
 
-test("landing exposes recommendation actions and planned account controls", async () => {
+test("landing exposes recommendation actions and wired account controls", async () => {
   const all = (await readLandingSources()).join("\n");
-  const nav = await read("src/components/landing/landing-nav.tsx");
+  const auth = await read("src/components/landing/landing-auth.tsx");
 
+  // 로그인과 찜 목록은 실제로 동작하므로 연결한다. 프로필·시청기록·커뮤니티는
+  // 여전히 이 제품의 범위 밖이라 링크가 생기면 안 된다.
   assert.doesNotMatch(
     all,
-    /href=["']\/(?:login|signup|profile|my|saved|watched|community)/i,
+    /href=["']\/(?:signup|profile|my|watched|community)/i,
   );
-  assert.doesNotMatch(
-    all,
-    /CREATE ACCOUNT|무료로 가입|커뮤니티/i,
-  );
+  assert.doesNotMatch(all, /CREATE ACCOUNT|무료로 가입|커뮤니티/i);
   assert.doesNotMatch(all, /href=["']#["']/);
   assert.match(all, /href="\/choice"/);
   assert.match(all, /href="\/prompt"/);
-  assert.match(nav, />\s*회원가입\s*</);
-  assert.match(nav, />\s*로그인\s*</);
-  assert.equal(
-    [...nav.matchAll(/<button\b[\s\S]*?\bdisabled\b[\s\S]*?<\/button>/g)].length,
-    2,
+
+  assert.match(auth, />\s*회원가입\s*</);
+  assert.match(auth, />\s*로그인\s*</);
+  assert.match(auth, /href="\/login"/);
+  assert.match(
+    auth,
+    /href="\/login\?mode=signup"/,
+    "회원가입으로 들어온 사람에게 로그인 칸을 먼저 보이면 한 번 더 눌러야 한다",
   );
+  assert.match(auth, /href="\/watchlist"/);
+
+  // 준비 중 자리표시자는 남아 있으면 안 된다. 실제로 되는 기능을 안 되는 것처럼
+  // 보여주는 셈이다.
+  assert.equal(
+    [...all.matchAll(/<button\b[\s\S]*?\bdisabled\b[\s\S]*?<\/button>/g)].length,
+    0,
+  );
+  assert.doesNotMatch(all, /준비 중/);
+
+  // 로그인 여부를 확인하기 전에는 어느 쪽도 단정하지 않는다.
+  assert.match(auth, /loading/);
   assert.doesNotMatch(all, /익명 추천 서비스|계정 없이/);
 });
 

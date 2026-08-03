@@ -110,7 +110,13 @@ export class PrismaRepositoryError extends Error {
       | "RUN_ALREADY_EXISTS"
       | "RUN_NOT_FOUND"
       | "CATALOG_WRITE_FAILED"
-      | "INVALID_VECTOR",
+      | "INVALID_VECTOR"
+      | "ACCOUNT_CREATE_FAILED"
+      | "ACCOUNT_LOOKUP_FAILED"
+      | "WATCHLIST_LIST_FAILED"
+      | "WATCHLIST_ADD_FAILED"
+      | "WATCHLIST_REMOVE_FAILED"
+      | "WATCHLIST_CLEAR_FAILED",
   ) {
     super(code);
     this.name = "PrismaRepositoryError";

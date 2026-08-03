@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { WatchlistNavLink } from "./watchlist/watchlist-nav-link";
 
 type AppShellProps = {
   children: ReactNode;
@@ -84,6 +85,7 @@ export function AppShell({
                       추천 결과
                     </span>
                   ) : null}
+                  <WatchlistNavLink />
                   <Link
                     href="/choice"
                     className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#ff6b3d] px-5 py-2 text-sm font-extrabold text-white shadow-[0_8px_30px_rgba(255,107,61,0.22)] transition hover:-translate-y-0.5 hover:bg-[#ff7d56] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"

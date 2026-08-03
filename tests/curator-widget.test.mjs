@@ -78,5 +78,7 @@ test("curator route remains separate from public search and persistence", async 
   assert.match(service, /requireMeaningfulChoice: true/);
   assert.match(deterministic, /parseNaturalInput/);
   assert.doesNotMatch(openAiAdapter, /domains\/curator|domains\/recommendation/);
-  assert.equal((schema.match(/^model\s+/gm) ?? []).length, 6);
+  // 6 -> 8: v0.9 에서 승인받은 Account, WatchlistItem 이 늘었다. 이 검사의 뜻은
+  // "curator 가 모델을 늘리지 않는다" 이고, 위의 doesNotMatch 들이 그것을 지킨다.
+  assert.equal((schema.match(/^model\s+/gm) ?? []).length, 8);
 });
