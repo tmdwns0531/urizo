@@ -678,8 +678,11 @@ test("active score renormalizes absent genre weight without UserContext", async 
     [{ content: content(), semanticScore: 0.8 }],
     input,
   );
+  // runtime 항목은 시청 시간을 고르지 않으면 1 이다. 예전에는 0.7 을 박아
+  // 넣어, 조건을 덜 건 사람이 오히려 감점을 받았다 (무제한이면 전체가 73%
+  // 근처에서 막히고 120분을 고르면 80%대가 나왔다).
   const expected =
-    (0.8 * 0.15 + 0.5 * 0.29 + 0.7 * 0.15 + 0.5 * 0.1 + 0.7 * 0.05) /
+    (0.8 * 0.15 + 0.5 * 0.29 + 1 * 0.15 + 0.5 * 0.1 + 0.7 * 0.05) /
     (1 - 0.26);
   assert.equal(item.scoreBreakdown.genre, 0);
   assert.equal(item.matchPercent, null);

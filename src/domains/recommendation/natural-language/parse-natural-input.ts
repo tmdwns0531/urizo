@@ -92,6 +92,21 @@ const GENRE_PATTERNS: ReadonlyArray<{
 
 const GENRE_EXCLUSION_PATTERN =
   /(제외|빼고|빼\s*줘|빼줘|말고|안\s*나오|싫어)/;
+
+/**
+ * 절이 바뀌는 지점. 장르 뒤를 훑을 때 여기서 끊는다.
+ *
+ * 끊지 않으면 다른 절의 "제외" 를 그 장르의 것으로 오해한다 — "어벤져스같은
+ * 액션 영화 보고싶은데 매트릭스는 봐서 제외해줘" 에서 `액션` 뒤 24글자 안에
+ * 뒷절의 "제외" 가 들어와, 액션을 원한다고 말한 사람에게 액션을 빼고
+ * 추천하게 된다.
+ *
+ * 조사(은·는·을·를)는 경계가 아니다. "액션은 빼줘" 처럼 장르 바로 뒤에
+ * 조사가 붙는 경우가 흔해서, 그것까지 끊으면 정상적인 제외 표현을 놓친다.
+ * 절을 실제로 넘기는 연결어미와 문장부호만 경계로 본다.
+ */
+const CLAUSE_BOUNDARY_PATTERN =
+  /(는데|은데|ㄴ데|지만|으며|하며|[,.!?])/;
 const GENRE_REQUIREMENT_PATTERN =
   /(만\s*(?:보여|추천|골라|찾아)?|로만|이어야|반드시|꼭)/;
 const GENRE_PREFIX_REQUIREMENT_PATTERN = /(반드시|꼭)\s*$/;
@@ -205,10 +220,14 @@ function parseGenres(text: string): ParsedGenres {
       },
       null,
     );
-    const suffix = remainingText.slice(
+    // 다음 장르가 나오기 전까지, 그리고 절이 바뀌기 전까지만 본다.
+    const windowText = remainingText.slice(
       0,
       Math.min(nextGenreOffset ?? 24, 24),
     );
+    const clauseEnd = windowText.search(CLAUSE_BOUNDARY_PATTERN);
+    const suffix =
+      clauseEnd < 0 ? windowText : windowText.slice(0, clauseEnd);
     const prefix = text.slice(Math.max(0, match.index - 12), match.index);
     if (GENRE_EXCLUSION_PATTERN.test(suffix)) {
       excluded.push(...values);
