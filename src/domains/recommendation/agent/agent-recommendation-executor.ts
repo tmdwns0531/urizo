@@ -6,7 +6,10 @@ import type {
 } from "../../../contracts/mvp-recommendation";
 import type { RecommendationItem } from "../../../contracts/recommendation";
 import type { TransientRecommendationSearchInput } from "../../../contracts/mvp-search";
-import { RESULT_LIMIT } from "../../../config/recommendation";
+import {
+  RESULT_LIMIT,
+  SELECTOR_CANDIDATE_LIMIT,
+} from "../../../config/recommendation";
 import { BudgetExceededError } from "../budget";
 import type {
   ExecutionAttempt,
@@ -186,6 +189,11 @@ export class AgentRecommendationExecutor implements MvpRecommendationExecutor {
 
     try {
       consumeSearchModelUsage(searchResult, context);
+      // 교체용 깊이는 ranked 전체로 남기고, 모델에는 상위 일부만 보낸다.
+      const selectorCandidates = searchResult.ranked.slice(
+        0,
+        SELECTOR_CANDIDATE_LIMIT,
+      );
       const selectorOutput =
         context.selectionMode === "ranked"
           ? {
@@ -198,7 +206,7 @@ export class AgentRecommendationExecutor implements MvpRecommendationExecutor {
             ? await context.budget.runModel(
                 (signal) =>
                   this.selector.select(
-                    searchResult.ranked,
+                    selectorCandidates,
                     this.resultLimit,
                     signal,
                   ),
@@ -206,7 +214,7 @@ export class AgentRecommendationExecutor implements MvpRecommendationExecutor {
                 readErrorTokenUsage,
               )
             : await this.selector.select(
-                searchResult.ranked,
+                selectorCandidates,
                 this.resultLimit,
               );
 

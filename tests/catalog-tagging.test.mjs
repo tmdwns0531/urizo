@@ -124,14 +124,77 @@ test("CAT-02: 부분일치 오탐이 없다 — dark comedy 는 밝은이 아니
   assert.ok(moods.includes("어두운"));
 });
 
-test("CAT-02: keyword 근거가 없으면 genre 로 보조하고, 둘 다 없으면 비운다", async () => {
+test("CAT-02: 톤 낱말이 없으면 붙이지 않는다 — 소재나 장르만으로는 부족하다", async () => {
   const { deriveMoodTags } = await loadModule(TAGGING);
 
-  assert.deepEqual(deriveMoodTags([], ["액션"]), ["자극적인"]);
+  // 소재는 "무엇이 나오는가", 톤은 "어떤 느낌인가" 다. 소재만으로 확정하면
+  // 어벤져스가 friendship+teamwork 로 `따뜻한`, 토이 스토리가 villain+
+  // bullying 로 `어두운`, 주토피아 2 가 cop+미스터리 장르로 `긴장감 있는`
+  // 이 된다. 실제 수집분에서 확인한 오탐이다.
+  assert.deepEqual(
+    deriveMoodTags([], ["액션"]),
+    [],
+    "장르만으로 분위기를 붙이면 안 된다",
+  );
   assert.deepEqual(
     deriveMoodTags(["duringcreditsstinger", "based on comic"], []),
     [],
     "근거가 없으면 지어내지 말고 비워야 한다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["friendship", "teamwork"], ["애니메이션"]),
+    [],
+    "어벤져스 유형: 관계 낱말만으로 따뜻한이 되면 안 된다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["cop", "detective"], ["미스터리"]),
+    [],
+    "주토피아 유형: 경찰·탐정 소재만으로 긴장감 있는이 되면 안 된다",
+  );
+});
+
+test("CAT-02: 분위기를 정의하는 낱말은 그 분위기의 톤으로 인정한다", async () => {
+  const { deriveMoodTags } = await loadModule(TAGGING);
+
+  // 화면 문구가 분위기를 어떻게 정의하는지에 맞춘다. `강렬하고 속도감 있는`
+  // 은 "액션과 빠른 전개" 라서 action·superhero 가 곧 그 느낌이고,
+  // `감정선이 풍부한` 은 "감정선, 음악, 관계 중심" 이라 romance·music 이
+  // 곧 그 느낌이다. 반면 `따뜻하게 위로받는` 은 "공감과 회복" 이라
+  // friendship 은 관계일 뿐 톤이 아니다.
+  assert.deepEqual(
+    deriveMoodTags(["superhero", "martial arts"], []),
+    ["자극적인"],
+    "액션 낱말은 강렬하고 속도감 있는의 톤이다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["romance", "music"], []),
+    ["감성적인"],
+    "로맨스·음악은 감정선이 풍부한의 톤이다",
+  );
+});
+
+test("CAT-02: 톤 낱말이 있으면 소재나 장르가 근거를 채운다", async () => {
+  const { deriveMoodTags } = await loadModule(TAGGING);
+
+  assert.deepEqual(
+    deriveMoodTags(["aggressive", "superhero"], []),
+    ["자극적인"],
+    "톤 1개 + 소재 1개면 채택한다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["enthusiastic"], ["코미디"]),
+    ["밝은"],
+    "톤 1개 + 장르 일치면 채택한다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["enthusiastic"], ["다큐멘터리"]),
+    [],
+    "톤 1개뿐이고 장르도 안 맞으면 채택하지 않는다",
+  );
+  assert.deepEqual(
+    deriveMoodTags(["depressing", "nihilism"], []),
+    ["어두운"],
+    "톤 2개면 장르 없이도 채택한다",
   );
 });
 

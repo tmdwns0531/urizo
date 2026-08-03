@@ -572,3 +572,33 @@ test("Choice handoff provider allowlists only structured form fields", async () 
     /return\s*\{\s*\.\.\.draft|naturalLanguage|inputText|raw/,
   );
 });
+
+test("genre exclusion stays inside its own clause", async () => {
+  const parser = await loadNaturalParser();
+
+  // 장르 뒤 24글자만 보고 "제외" 를 찾으면, 다른 절의 제외 표현이 딸려와
+  // 원하는 장르를 반대로 빼버린다. 실제로 "어벤져스같은 액션 영화 보고싶은데
+  // 매트릭스는 봐서 제외해줘" 가 `액션 제외` 로 해석되어, 액션을 요청한
+  // 사용자에게 코코·너의 이름은이 추천됐다.
+  const otherClause = parser.parseNaturalInput(
+    "어벤져스같은 액션 영화 보고싶은데 매트릭스는 봐서 제외해줘",
+  );
+  assert.deepEqual(otherClause.desiredGenres.value, ["액션"]);
+  assert.deepEqual(otherClause.excludedGenres.value, []);
+
+  // 같은 절 안의 제외는 그대로 인식해야 한다. 조사(은·는)는 절 경계가 아니다.
+  const sameClause = parser.parseNaturalInput("액션은 빼줘");
+  assert.deepEqual(sameClause.excludedGenres.value, ["액션"]);
+
+  // 절이 나뉘어 각각 원함·제외인 경우도 구분한다.
+  const bothClauses = parser.parseNaturalInput(
+    "로맨스 영화 보고싶은데 코미디는 빼줘",
+  );
+  assert.deepEqual(bothClauses.desiredGenres.value, ["로맨스"]);
+  assert.deepEqual(bothClauses.excludedGenres.value, ["코미디"]);
+
+  assert.deepEqual(
+    parser.parseNaturalInput("액션만 보여줘").requiredGenres.value,
+    ["액션"],
+  );
+});
