@@ -220,7 +220,11 @@ export function ContentCard({
           {item.reasons[0]}
         </p>
 
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+        {/* `mt-auto` keeps this row on the card floor. Card heights are already
+            equalised by `h-full`, but the badge row and the meta line wrap at
+            different lengths per title, so a fixed top margin let the action
+            row drift up by one line. */}
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-5">
           {provider ? (
             <a
               href={provider.watchUrl}

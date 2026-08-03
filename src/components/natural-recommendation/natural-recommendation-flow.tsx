@@ -9,6 +9,10 @@ import type {
 import { toAnonymousAdContext } from "../advertising/sponsored-video-ad";
 import { AppShell } from "../app-shell";
 import { buildRecommendationRequest } from "../choice-stepper/choice-state";
+import {
+  REPLACEMENT_FEEDBACK,
+  type ReplacementFeedback,
+} from "../recommendation-view";
 import { NaturalInputStep } from "./natural-input-step";
 import {
   buildNaturalRecommendationRequest,
@@ -40,6 +44,8 @@ type NaturalFlowState = {
   error: string;
   deciding: MvpApprovalDecision | MvpClarificationAnswer | null;
   decisionError: string;
+  replacingId: string | null;
+  replacementFeedback: ReplacementFeedback | null;
 };
 
 type NaturalFlowAction =
@@ -61,6 +67,9 @@ type NaturalFlowAction =
       interpretation?: NaturalInterpretation;
     }
   | { type: "DECISION_ERROR"; value: string }
+  | { type: "START_REPLACEMENT"; contentId: string }
+  | { type: "REPLACEMENT_RESULT"; response: MvpRecommendationResponse }
+  | { type: "REPLACEMENT_ERROR"; feedback: ReplacementFeedback }
   | { type: "RESET" };
 
 const INITIAL_NATURAL_FLOW_STATE: NaturalFlowState = {
@@ -72,6 +81,8 @@ const INITIAL_NATURAL_FLOW_STATE: NaturalFlowState = {
   error: "",
   deciding: null,
   decisionError: "",
+  replacingId: null,
+  replacementFeedback: null,
 };
 
 function naturalFlowReducer(
@@ -122,6 +133,8 @@ function naturalFlowReducer(
         error: "",
         deciding: null,
         decisionError: "",
+        replacingId: null,
+        replacementFeedback: null,
       };
     case "VALIDATION_ERROR":
       return { ...state, error: action.value };
@@ -134,6 +147,8 @@ function naturalFlowReducer(
         error: "",
         deciding: null,
         decisionError: "",
+        replacingId: null,
+        replacementFeedback: null,
       };
     case "SHOW_MATCHING":
       return state.step === "analyzing" ? { ...state, step: "matching" } : state;
@@ -143,6 +158,8 @@ function naturalFlowReducer(
         step: "result",
         response: action.response,
         error: "",
+        replacingId: null,
+        replacementFeedback: null,
       };
     case "REQUEST_ERROR":
       return {
@@ -164,6 +181,25 @@ function naturalFlowReducer(
       };
     case "DECISION_ERROR":
       return { ...state, deciding: null, decisionError: action.value };
+    case "START_REPLACEMENT":
+      return {
+        ...state,
+        replacingId: action.contentId,
+        replacementFeedback: REPLACEMENT_FEEDBACK.pending,
+      };
+    case "REPLACEMENT_RESULT":
+      return {
+        ...state,
+        response: action.response,
+        replacingId: null,
+        replacementFeedback: REPLACEMENT_FEEDBACK.success,
+      };
+    case "REPLACEMENT_ERROR":
+      return {
+        ...state,
+        replacingId: null,
+        replacementFeedback: action.feedback,
+      };
     case "RESET":
       return INITIAL_NATURAL_FLOW_STATE;
   }
@@ -204,6 +240,7 @@ export function NaturalRecommendationFlow() {
   );
   const activeRequest = useRef<AbortController | null>(null);
   const requestSequence = useRef(0);
+  const replacementLock = useRef(false);
 
   useEffect(() => {
     return () => activeRequest.current?.abort();
@@ -312,6 +349,65 @@ export function NaturalRecommendationFlow() {
       return;
     }
     void startRecommendation();
+  }
+
+  /**
+   * Reuses the stored query vector and ranking through the run's `ranked`
+   * replacement mode, so a single card can change without paying for another
+   * embedding or selector call.
+   */
+  async function replaceContent(contentId: string) {
+    const response = state.response;
+    if (response?.status !== "completed" || replacementLock.current) return;
+    replacementLock.current = true;
+    dispatch({ type: "START_REPLACEMENT", contentId });
+    try {
+      const request = await fetch(
+        `/api/recommendations/${encodeURIComponent(response.runId)}/replacement`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ contentId }),
+        },
+      );
+      const result = (await request.json().catch(() => null)) as
+        | MvpRecommendationResponse
+        | { error?: string }
+        | null;
+      if (!request.ok || !isRecommendationResponse(result)) {
+        const message =
+          (result && "error" in result && result.error) ||
+          "다른 후보가 없어요.";
+        // 400 means the candidate pool is exhausted, not that the call failed.
+        const base =
+          request.status === 400
+            ? REPLACEMENT_FEEDBACK.exhausted
+            : REPLACEMENT_FEEDBACK.error;
+        dispatch({
+          type: "REPLACEMENT_ERROR",
+          feedback: {
+            ...base,
+            description: `${message} 기존 결과는 그대로 유지했어요.`,
+          },
+        });
+        return;
+      }
+      if (result.status !== "completed") {
+        dispatch({
+          type: "REPLACEMENT_ERROR",
+          feedback: REPLACEMENT_FEEDBACK.error,
+        });
+        return;
+      }
+      dispatch({ type: "REPLACEMENT_RESULT", response: result });
+    } catch {
+      dispatch({
+        type: "REPLACEMENT_ERROR",
+        feedback: REPLACEMENT_FEEDBACK.error,
+      });
+    } finally {
+      replacementLock.current = false;
+    }
   }
 
   async function decideApproval(
@@ -467,6 +563,9 @@ export function NaturalRecommendationFlow() {
             dispatch({ type: "SHOW_INPUT" });
           }}
           onReset={resetFlow}
+          onReplace={(contentId) => void replaceContent(contentId)}
+          replacingId={state.replacingId}
+          replacementFeedback={state.replacementFeedback}
         />
       ) : null}
     </AppShell>

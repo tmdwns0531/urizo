@@ -12,6 +12,10 @@ import type {
 import { SponsoredVideoAd } from "../advertising/sponsored-video-ad";
 import { useChoiceHandoff } from "../choice-handoff/choice-handoff-provider";
 import { ContentCard } from "../content-card";
+import {
+  ReplacementFeedbackNotice,
+  type ReplacementFeedback,
+} from "../recommendation-view";
 import { RecommendationTimeline } from "../recommendation-timeline";
 import { NaturalConditionSummary } from "./natural-condition-summary";
 import type { NaturalInterpretation } from "./natural-language";
@@ -28,6 +32,9 @@ type NaturalResultProps = {
   onAllowAnyMediaType: () => void;
   onEditInput: () => void;
   onReset: () => void;
+  onReplace: (contentId: string) => void;
+  replacingId: string | null;
+  replacementFeedback: ReplacementFeedback | null;
 };
 
 function RuntimeApprovalBanner({
@@ -168,10 +175,16 @@ function CompletedNaturalResults({
   response,
   onAllowAnyMediaType,
   onEditInput,
+  onReplace,
+  replacingId,
+  replacementFeedback,
 }: {
   response: MvpCompletedRecommendationResponse;
   onAllowAnyMediaType: () => void;
   onEditInput: () => void;
+  onReplace: (contentId: string) => void;
+  replacingId: string | null;
+  replacementFeedback: ReplacementFeedback | null;
 }) {
   const alternatives = response.recommendations
     .filter((item) => item.content.id !== response.topPick?.content.id)
@@ -228,10 +241,19 @@ function CompletedNaturalResults({
         </aside>
       ) : null}
 
+      <ReplacementFeedbackNotice feedback={replacementFeedback} />
+
       {response.topPick ? (
         <section aria-labelledby="natural-top-pick-title">
           <h2 id="natural-top-pick-title" className="sr-only">가장 먼저 추천하는 작품</h2>
-          <ContentCard item={response.topPick} rank={1} hero />
+          <ContentCard
+            item={response.topPick}
+            rank={1}
+            hero
+            onReplace={onReplace}
+            replacing={replacingId === response.topPick.content.id}
+            replacementPending={replacingId !== null}
+          />
         </section>
       ) : (
         <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
@@ -291,6 +313,9 @@ function CompletedNaturalResults({
                 item={item}
                 rank={index + 2}
                 rail
+                onReplace={onReplace}
+                replacing={replacingId === item.content.id}
+                replacementPending={replacingId !== null}
                 key={item.content.id}
               />
             ))}
@@ -364,6 +389,9 @@ export function NaturalRecommendationResult({
   onAllowAnyMediaType,
   onEditInput,
   onReset,
+  onReplace,
+  replacingId,
+  replacementFeedback,
 }: NaturalResultProps) {
   const displayedCount =
     response.status === "completed"
@@ -448,6 +476,9 @@ export function NaturalRecommendationResult({
             response={response}
             onAllowAnyMediaType={onAllowAnyMediaType}
             onEditInput={onEditInput}
+            onReplace={onReplace}
+            replacingId={replacingId}
+            replacementFeedback={replacementFeedback}
           />
 
           <div className="mt-7">
