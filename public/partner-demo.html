@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VIA PLAY</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; font-family: system-ui, sans-serif; color: #fff; background: #07101f; }
+      header { padding: 1.25rem clamp(1.25rem, 5vw, 5rem); border-bottom: 1px solid #ffffff1f; }
+      header strong { font-size: 1.25rem; letter-spacing: .12em; }
+      p { color: #b7c4da; }
+      main { min-height: calc(100vh - 4.5rem); display: grid; place-items: center; padding: clamp(2rem, 6vw, 6rem); background: radial-gradient(circle at 75% 25%, #6056d955, transparent 34%), linear-gradient(135deg, #07101f, #13233d); }
+      section { width: min(100%, 70rem); }
+      small { display: inline-block; color: #8dd9ff; font-weight: 800; letter-spacing: .12em; }
+      h1 { max-width: 13ch; margin: 1rem 0; font-size: clamp(3rem, 8vw, 7rem); line-height: .98; letter-spacing: -.06em; }
+      p { max-width: 38rem; font-size: clamp(1rem, 2vw, 1.25rem); line-height: 1.8; }
+      a { display: inline-flex; min-height: 3rem; align-items: center; margin-top: 1.5rem; padding: 0 1.5rem; border-radius: 999px; color: #07101f; background: #8dd9ff; font-weight: 900; text-decoration: none; }
+      a:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>VIA PLAY</strong>
+    </header>
+    <main>
+      <section>
+        <small>VIA PLAY ORIGINAL</small>
+        <h1 id="title">루미아의 유리숲 산책</h1>
+        <p id="description">새로운 판타지를 VIA PLAY에서 만나보세요.</p>
+        <a href="#membership">이용권 알아보기</a>
+      </section>
+    </main>
+    <script>
+      if (new URLSearchParams(location.search).get("campaign") === "orbiel") {
+        document.title = "오르비엘의 푸른 우편함 | VIA PLAY";
+        document.querySelector("#title").textContent = "오르비엘의 푸른 우편함";
+        document.querySelector("#description").textContent = "따뜻한 이야기를 VIA PLAY에서 만나보세요.";
+      }
+    </script>
+  </body>
+</html>

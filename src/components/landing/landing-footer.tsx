@@ -13,7 +13,7 @@ export function LandingFooter() {
             </h2>
           </div>
           <Link href="/choice" className="group inline-flex w-fit items-center gap-3 rounded-full bg-[#ff6b3d] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_14px_38px_rgba(255,107,61,.2)] transition hover:-translate-y-0.5 hover:bg-[#ff7c54] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:text-base">
-            추천 시작하기
+            조건을 골라 추천받기
             <span className="text-lg transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
           </Link>
         </div>

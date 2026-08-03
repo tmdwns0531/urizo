@@ -37,7 +37,7 @@ const APPROVED_CAMPAIGNS: readonly ApprovedCampaign[] = [
       workTitle: "오르비엘의 푸른 우편함",
       campaignTitle: "느긋한 저녁의 스폰서 셀렉션",
       posterUrl: "/sponsored-stillwater.svg",
-      detailUrl: "/",
+      detailUrl: "/sponsor/demo?campaign=orbiel",
     },
   },
   {
@@ -53,10 +53,10 @@ const APPROVED_CAMPAIGNS: readonly ApprovedCampaign[] = [
     },
     creative: {
       id: "fictional-lumea-glass-forest",
-      workTitle: "루메아의 유리숲 산책",
+      workTitle: "루미아의 유리숲 산책",
       campaignTitle: "고요한 판타지 스폰서 컬렉션",
-      posterUrl: "/sponsored-evening-garden.svg",
-      detailUrl: "/",
+      posterUrl: "/lumia-glass-forest-poster.webp",
+      detailUrl: "/sponsor/demo",
     },
   },
 ] as const;

@@ -366,9 +366,13 @@ test("비교 화면은 독립 경로이며 RAG·LLM·신규 공개 API 없이 �
 });
 
 test("completed results enter comparison through a two-item tray", async () => {
-  const [tray, structuredResult, naturalResult, contentCard] = await Promise.all([
+  const [tray, sharedResult, structuredResult, naturalResult, contentCard] = await Promise.all([
     readFile(
       path.resolve(rootPath, "src/components/content-comparison/recommendation-comparison-tray.tsx"),
+      "utf8",
+    ),
+    readFile(
+      path.resolve(rootPath, "src/components/completed-recommendation-result.tsx"),
       "utf8",
     ),
     readFile(
@@ -392,10 +396,10 @@ test("completed results enter comparison through a two-item tray", async () => {
   assert.match(tray, /encodeURIComponent/);
   assert.match(tray, /selectedContents\.length === 2/);
   assert.match(tray, /selectedContents\.length === 1/);
-  assert.match(structuredResult, /<RecommendationComparisonTray/);
-  assert.match(structuredResult, /<ComparisonCandidate/);
-  assert.match(naturalResult, /<RecommendationComparisonTray/);
-  assert.match(naturalResult, /<ComparisonCandidate/);
+  assert.match(sharedResult, /<RecommendationComparisonTray/);
+  assert.match(sharedResult, /<ComparisonCandidate/);
+  assert.match(structuredResult, /<CompletedRecommendationResult/);
+  assert.match(naturalResult, /<CompletedRecommendationResult/);
   assert.doesNotMatch(contentCard, /ComparisonCandidate|comparison-tray/);
   assert.doesNotMatch(
     tray,

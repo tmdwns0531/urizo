@@ -231,25 +231,21 @@ test("CHOICE summary contains only the structured step selections", async () => 
 });
 
 test("child rating copy matches the maximum allowed rating filter", async () => {
-  const [stepOne, summary, canonical, naturalAge, naturalLanguage, naturalResult] =
+  const [stepOne, summary, completed, naturalAge, naturalLanguage] =
     await Promise.all([
       readSource("src/components/choice-stepper/step-1-who.tsx"),
       readSource("src/components/choice-stepper/step-6-summary.tsx"),
-      readSource("src/components/recommendation-view.tsx"),
+      readSource("src/components/completed-recommendation-result.tsx"),
       readSource("src/components/natural-recommendation/natural-age-step.tsx"),
       readSource("src/components/natural-recommendation/natural-language.ts"),
-      readSource("src/components/natural-recommendation/natural-result.tsx"),
     ]);
 
   assert.ok(stepOne.includes("선택한 관람 등급을 최대 허용 기준으로 결과 필터에 직접"));
   assert.ok(summary.includes("최대 허용 관람등급:"));
-  assert.ok(canonical.includes("고른 관람 등급을 최대 허용 기준으로 결과 필터에"));
-  assert.ok(canonical.includes("선택한 최대 허용 관람등급을 포함한 모든 조건으로"));
+  assert.ok(completed.includes("고른 관람 등급을 최대 허용 기준으로 결과 필터에"));
+  assert.ok(completed.includes("선택한 최대 허용 관람등급을 포함한 모든 조건으로"));
   assert.ok(naturalAge.includes("선택한 관람 등급을 최대 허용"));
   assert.ok(naturalLanguage.includes("최대 허용 관람등급으로 결과 필터에 적용했어요"));
-  assert.ok(naturalResult.includes("가족 구성을 확인한 뒤, 아이 동반이면 고른 관람 등급을"));
-  assert.ok(naturalResult.includes("결과 필터에 적용했고, 직접 말한 조건과 기본값을"));
-  assert.ok(naturalResult.includes("선택한 최대 허용 관람등급을 포함한 모든 조건으로"));
 
   const allCopy = [stepOne, summary, naturalAge, naturalLanguage].join("\n");
   for (const staleCopy of [

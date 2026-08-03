@@ -3,7 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(
-  new URL("../src/components/recommendation-view.tsx", import.meta.url),
+  new URL(
+    "../src/components/completed-recommendation-result.tsx",
+    import.meta.url,
+  ),
   "utf8",
 );
 
@@ -69,7 +72,7 @@ test("replacement feedback states render through a visible notice", () => {
   );
   const noticeBody = source.slice(
     source.indexOf("export function ReplacementFeedbackNotice"),
-    source.indexOf("function ApprovalView"),
+    source.indexOf("function rememberNotInterested"),
   );
 
   for (const status of ["pending", "success", "exhausted", "error"]) {
@@ -90,8 +93,7 @@ test("replacement feedback states render through a visible notice", () => {
 
 test("five recommendation IDs keep a five-card completed layout", () => {
   const completedBody = source.slice(
-    source.indexOf("export function CompletedView"),
-    source.indexOf("export function RecommendationView"),
+    source.indexOf("export function CompletedRecommendationResult"),
   );
   const ids = Array.from({ length: 5 }, (_, index) => `content-${index + 1}`);
   const topPickId = ids[0];
@@ -100,7 +102,7 @@ test("five recommendation IDs keep a five-card completed layout", () => {
   assert.equal(1 + alternativeIds.length, ids.length);
   assert.match(
     completedBody,
-    /조건에 맞는 \{response\.recommendations\.length\}편을 찾았어요\./,
+    /조건에 맞는 \{response\.recommendations\.length\}편을 찾았어요/,
   );
   assert.match(
     completedBody,
@@ -115,27 +117,42 @@ test("five recommendation IDs keep a five-card completed layout", () => {
 test("replacement flow keeps the click lock and maps visible outcomes", () => {
   const replacementBody = source.slice(
     source.indexOf("  async function replace("),
-    source.indexOf("  if (loading) {"),
+    source.indexOf("  async function replaceAll("),
   );
 
   assert.match(replacementBody, /if \(replacementLock\.current\) return;/);
   assert.match(replacementBody, /replacementLock\.current = true;/);
   assert.match(
     replacementBody,
-    /setReplacementFeedback\(REPLACEMENT_FEEDBACK\.pending\)/,
+    /showFeedback\(REPLACEMENT_FEEDBACK\.pending\)/,
   );
   assert.match(
-    replacementBody,
+    source,
     /request\.status === 400 \? "exhausted" : "error"/,
   );
   assert.match(
     replacementBody,
-    /setReplacementFeedback\(REPLACEMENT_FEEDBACK\.success\)/,
+    /showFeedback\(REPLACEMENT_FEEDBACK\.success\)/,
   );
   assert.match(
     replacementBody,
     /finally \{[\s\S]*replacementLock\.current = false;[\s\S]*setReplacingId\(null\)/,
   );
+});
+
+test("same-condition refresh reuses safe continuation replacements", () => {
+  const replacementBody = source.slice(
+    source.indexOf("  async function replaceAll("),
+    source.indexOf("  const provider ="),
+  );
+
+  assert.match(replacementBody, /for \(const item of response\.recommendations\)/);
+  assert.match(
+    replacementBody,
+    /requestReplacement\(current\.runId, item\.content\.id\)/,
+  );
+  assert.match(replacementBody, /onResponseChange\(current\)/);
+  assert.doesNotMatch(replacementBody, /Math\.random|sort\(\(\) =>/);
 });
 
 test("Demo replacement preserves five cards and the last snapshot on exhaustion", async () => {
