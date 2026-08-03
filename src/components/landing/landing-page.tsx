@@ -1,4 +1,5 @@
 import { AppShell } from "../app-shell";
+import { DailyLineLiveSection } from "../daily-line-live";
 import { LandingFeatures } from "./landing-features";
 import { LandingFooter } from "./landing-footer";
 import { LandingHero } from "./landing-hero";
@@ -14,6 +15,7 @@ export function LandingPage() {
     >
       <main>
         <LandingHero />
+        <DailyLineLiveSection />
         <RecommendationShowcase />
         <LandingFeatures />
       </main>
