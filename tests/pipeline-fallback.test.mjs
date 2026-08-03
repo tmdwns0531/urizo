@@ -95,7 +95,11 @@ function searchInput(overrides = {}) {
     moods: ["밝은"],
     desiredGenres: [],
     companionAvoidGenres: [],
+    requiredGenres: [],
+    excludedGenres: [],
+    mediaType: "ANY",
     maxRuntimeMinutes: null,
+    childAgeRatingLimit: null,
     originPreference: "ANY",
     hasNaturalLanguage: false,
     ...overrides,
@@ -120,6 +124,37 @@ function fallbackInput(eligibleCatalog, input = searchInput()) {
     excludedContentIds: [],
   };
 }
+
+test("fallback은 TOP5를 유지하며 TOP1 이유를 2~3개로 보장한다", async () => {
+  const { ruleBasedFallback } = await loadModule(
+    "src/domains/recommendation/fallback.ts",
+  );
+  const catalog = Array.from({ length: 6 }, (_, index) =>
+    content({ id: `content-${index}`, title: `작품 ${index}` }),
+  );
+
+  const result = ruleBasedFallback(
+    fallbackInput(
+      catalog,
+      searchInput({
+        companions: ["ANY"],
+        moods: [],
+        desiredGenres: [],
+        maxRuntimeMinutes: null,
+      }),
+    ),
+  );
+
+  assert.equal(result.selected.length, 5, "fallback TOP5는 유지되어야 한다");
+  assert.ok(
+    result.selected[0].reasons.length >= 2,
+    "fallback TOP1 이유는 최소 2개여야 한다",
+  );
+  assert.ok(
+    result.selected[0].reasons.length <= 3,
+    "fallback TOP1 이유는 최대 3개여야 한다",
+  );
+});
 
 test("fallback도 연령·provider·runtime·origin 필수 필터를 유지한다", async () => {
   const { ruleBasedFallback } = await loadModule(
@@ -193,6 +228,60 @@ test("fallback은 TOP5를 채우려고 조건을 완화하지 않는다", async 
     `조건을 완화해 부적합 후보로 5칸을 채웠다: ${JSON.stringify(selectedIds)}`,
   );
   assert.equal(result.eligibleCount, 2);
+});
+
+test("fallback은 작품 유형과 명시적 장르 조건을 자동 완화하지 않는다", async () => {
+  const { ruleBasedFallback } = await loadModule(
+    "src/domains/recommendation/fallback.ts",
+  );
+  const movie = content({
+    id: "movie",
+    mediaType: "MOVIE",
+    genres: ["코미디"],
+  });
+  const series = content({
+    id: "series",
+    mediaType: "SERIES",
+    genres: ["코미디"],
+    voteAverage: 10,
+    voteCount: 1_000_000,
+  });
+  const excludedMovie = content({
+    id: "excluded-movie",
+    mediaType: "MOVIE",
+    genres: ["코미디", "공포"],
+  });
+
+  const movieResult = ruleBasedFallback(
+    fallbackInput(
+      [series, excludedMovie, movie],
+      searchInput({
+        mediaType: "MOVIE",
+        requiredGenres: ["코미디"],
+        excludedGenres: ["공포"],
+      }),
+    ),
+  );
+  assert.deepEqual(
+    movieResult.selected.map(({ content: item }) => item.id),
+    ["movie"],
+  );
+  assert.ok(movieResult.excludedContentIds.includes("series"));
+  assert.ok(movieResult.excludedContentIds.includes("excluded-movie"));
+
+  const noMovieResult = ruleBasedFallback(
+    fallbackInput([series], searchInput({ mediaType: "MOVIE" })),
+  );
+  assert.equal(noMovieResult.eligibleCount, 0);
+  assert.deepEqual(noMovieResult.selected, []);
+
+  const anyResult = ruleBasedFallback(
+    fallbackInput([movie, series], searchInput({ mediaType: "ANY" })),
+  );
+  assert.deepEqual(
+    new Set(anyResult.selected.map(({ content: item }) => item.mediaType)),
+    new Set(["MOVIE", "SERIES"]),
+  );
 });
 
 test("fallback은 같은 입력에 같은 순서를 돌려준다", async () => {

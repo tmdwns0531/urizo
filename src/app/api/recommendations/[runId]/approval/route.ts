@@ -1,5 +1,10 @@
 import { withMvpComposition } from "@/composition";
-import type { MvpApprovalDecision } from "@/contracts/mvp-recommendation";
+import {
+  MVP_CLARIFICATION_ANSWERS,
+  type MvpApprovalDecision,
+  type MvpClarificationAnswer,
+} from "@/contracts/mvp-recommendation";
+import { NATURAL_LANGUAGE_MAX_CODE_POINTS } from "@/contracts/mvp-search";
 import {
   RecommendationRevisionConflictError,
   RecommendationRunNotFoundError,
@@ -10,6 +15,7 @@ import {
   enumValue,
   errorResponse,
   notFound,
+  optionalString,
   readJsonObject,
 } from "../../../_shared/http";
 
@@ -28,16 +34,36 @@ export async function POST(
     const runId = rawRunId.trim();
     if (!runId) throw badRequest("runId 값이 필요합니다.");
     const body = await readJsonObject(request);
-    if (Object.keys(body).some((key) => key !== "decision")) {
-      throw badRequest("승인 요청에는 decision 값만 사용할 수 있습니다.");
+    if ("decision" in body) {
+      if (Object.keys(body).some((key) => key !== "decision")) {
+        throw badRequest("조건 변경 응답에는 decision 값만 사용할 수 있습니다.");
+      }
+      const decision: MvpApprovalDecision = enumValue(
+        body.decision,
+        "decision",
+        APPROVAL_DECISIONS,
+      );
+      const response = await withMvpComposition(({ services }) =>
+        services.decideApproval(runId, decision),
+      );
+      return Response.json(response);
     }
-    const decision: MvpApprovalDecision = enumValue(
-      body.decision,
-      "decision",
-      APPROVAL_DECISIONS,
+
+    if (Object.keys(body).some((key) => key !== "answer" && key !== "naturalLanguage")) {
+      throw badRequest("추가 질문 응답에는 answer와 naturalLanguage만 사용할 수 있습니다.");
+    }
+    const answer: MvpClarificationAnswer = enumValue(
+      body.answer,
+      "answer",
+      MVP_CLARIFICATION_ANSWERS,
+    );
+    const naturalLanguage = optionalString(
+      body.naturalLanguage,
+      "naturalLanguage",
+      NATURAL_LANGUAGE_MAX_CODE_POINTS * 2,
     );
     const response = await withMvpComposition(({ services }) =>
-      services.decideApproval(runId, decision),
+      services.decideApproval(runId, answer, naturalLanguage),
     );
     return Response.json(response);
   } catch (error) {

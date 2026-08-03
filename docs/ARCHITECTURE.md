@@ -1,4 +1,4 @@
-# OTT 다모아 v0.8 Demo/LIVE architecture
+# OTT 다모아 v0.9 bounded-Agent Demo/LIVE architecture
 
 ## Authority
 
@@ -7,10 +7,12 @@ LIVE 범위와 인수 기준은
 없는 Demo 기준은 [`OTT-DAMOA-MVP-v0.6.md`](./OTT-DAMOA-MVP-v0.6.md), 익명
 실행 계약과 팀 기준선은
 [`BACKEND-SPRINT-OWNERSHIP-v0.7.md`](./BACKEND-SPRINT-OWNERSHIP-v0.7.md)를
-따른다. 이 문서는 구현 구조를 요약하며 위 문서보다 우선하지 않는다.
+따른다. v0.9 as-is 동작은 active contract/domain/schema/migration 코드가 우선하며,
+이 문서는 그 구현 구조와 명시적 supersession을 요약한다.
 
-v0.8의 활성 서비스는 익명 CHOICE → 추천 Run → 공개 Trace 흐름이다. 로그인,
-Profile, MY, 찜, 봤어요, 서버 저장 관심 없음은 제품 범위가 아니다.
+v0.9의 활성 서비스는 익명 CHOICE 또는 결정론 자연어 해석 → bounded Agent → 추천
+Run → 공개 Trace 흐름이다. 로그인, Profile, MY, 찜, 봤어요, 서버 저장 관심 없음은
+제품 범위가 아니다.
 
 ## Runtime preset
 
@@ -44,6 +46,18 @@ Route와 UI는 HTTP/UI 변환 뒤 익명 서비스만 호출한다. Domain은 Pr
 OpenAI를 직접 import하지 않는다. 공개 `/api/search`는 없으며 후보 검색은 추천
 orchestrator의 server-side port 안에서만 호출된다.
 
+위 그림은 목표 방향이다. 현재는 다음 as-is 역방향 의존 예외가 있다.
+
+- `src/domains/recommendation/orchestrator.ts` → `src/adapters/shared/id.ts`
+- memory/Prisma recommendation persistence adapters →
+  `src/domains/recommendation/trace.ts`
+- local/pgvector/OpenAI embedding adapters →
+  `src/domains/search/query.ts` 또는 `src/domains/search/semantic.ts`
+
+현행 동작을 설명할 때 이 양방향 예외를 숨기거나 새 예외를 늘리지 않는다. 해소는
+공용 ID, Trace sanitization, search-query/vector helper 경계 cleanup으로 별도
+review한다.
+
 ## Active boundaries
 
 | Boundary | Path |
@@ -55,6 +69,7 @@ orchestrator의 server-side port 안에서만 호출된다.
 | policy-safe execution attempt | `src/domains/recommendation/executors/types.ts` |
 | preset, selector, conditional environment validation | `src/config/adapters.ts` |
 | concrete assembly | `src/composition/**` |
+| static Demo advertising (⚠️ owner unassigned) | `src/contracts/advertising.ts`, `src/domains/advertising/**`, `src/app/api/ads/**`, `src/components/advertising/**` |
 
 과거 `user.ts`, `engagement.ts`, `search.ts`, `recommendation.ts`의 타입이 남아
 있더라도 새 구현에서 사용하지 않는다. 삭제·호환 정리는 공용 계약 변경으로
@@ -64,42 +79,68 @@ orchestrator의 server-side port 안에서만 호출된다.
 
 ```text
 strict anonymous request validation
--> mandatory catalog eligibility
--> local or pgvector candidate search
--> ranking and diversity scoring
--> deterministic or OpenAI selector inside budget
+-> deterministic parser structures neutral natural-language conditions
+-> at most one ambiguity question before search
+-> Agent calls the server-only searchCatalog tool once
+-> mandatory catalog eligibility + local/pgvector search + scoring
+-> deterministic or OpenAI allowlist selection inside budget
 -> response-time mandatory policy recheck
--> approval, safe fallback, or completion
+-> policy-owned runtime proposal + user approval + at most one re-search
+-> safe rule-based fallback or completion
 -> sanitized Run snapshot and ordered Trace append
 -> PUBLIC Trace projection
 ```
 
-연령, provider, runtime, origin, 제외, replacement 조건은 selector가 결정하지
-않는다. OpenAI selector는 필터와 점수가 끝난 후보 ID allowlist 안에서만 최대
-5개를 고른다. 모델 오류·timeout·invalid output·예산 초과는 정제된 fallback
-reason으로 바뀌며 raw prompt나 provider 오류는 응답·Run·Trace에 남기지 않는다.
+제한형 Agent는 질문 1회, `searchCatalog` 호출 1회, 승인 후 재검색 1회의 상한을
+가진다. 연령, provider, runtime, origin, 제외, replacement 조건은 Agent나 selector가
+결정하거나 임의로 완화하지 않는다. 조건 변경 가능 여부와 후보 부족 기준은
+Policy가 소유한다. 고정 CHOICE 프리셋의 허용 변경은 사용자 승인 후
+`runtime 30 → 45`다. 자연어의 정확한 45분 미만 제한은 먼저 그대로 적용하고,
+후보가 부족할 때만 `<30 → 30` 또는 `30 이상 45 미만 → 45`를 제안한다.
+OpenAI selector는 필터와 점수가 끝난 후보 ID allowlist 안에서만 최대 5개를
+고른다. 모델 오류·timeout·invalid output·예산 초과는 같은 조건의 rule-based
+1위부터 반환하는 fallback으로 바뀌며 raw prompt나 provider 오류는 응답·Run·Trace에
+남기지 않는다.
+
+가족 관련 1회 질문은 구성과 아이 관람등급을 함께 확정한다. 현재 Agent proposal은
+해결되지 않은 가족 입력에 `성인 가족 / 전체 / 7 / 12 / 15`를 한 번에 제시한다.
+구조화 CHOICE의 성인 가족은 정확한 `FAMILY`이므로 다시 묻지 않는다. 응답은 실제
+나이가 아닌
+`childAgeRatingLimit` 정책 상한으로 sanitized input에 저장되며 catalog 필터와 최종
+정책 재검사가 같은 상한을 적용한다. 상한 없이 WITH_CHILDREN 검색을 실행하려는
+경로는 fail closed한다.
+
+`searchCatalog`는 composition에서 선택된 저장 카탈로그와 local/pgvector search
+adapter만 사용한다. runtime 요청 중 TMDB를 호출하지 않으며, 도구 호출과 Agent
+선택은 각각 기존 `vector_search`, `select` PUBLIC Trace action으로 투명하게 표시한다.
 
 최초 LIVE 실행에서 embedding과 selector는 공통 model-call·token·deadline 예산을
-소비한다. 승인은 저장 vector를 재사용하고 selector를 실행하며, 교체는 저장
-vector·ranking·policy를 재사용하지만 selector 모델은 재호출하지 않는다.
+소비한다. 가족 답변은 검색 전 상태에서 첫 vector를 만들고, runtime 승인은 저장
+vector를 재사용해 selector를 실행한다. 교체는 저장 vector·ranking·policy를
+재사용하지만 selector 모델은 재호출하지 않는다.
 
 ## Anonymous continuation
 
-자연어 원문은 최초 요청 동안만 존재한다. 검색 adapter는 자연어와 CHOICE chip을
-합쳐 다음 중 하나의 vector snapshot을 만든 뒤 원문을 폐기한다.
+자연어 원문은 요청 동안만 transient하다. 가족 질문에 답할 때 원문이 브라우저에
+남아 있으면 다시 transient하게 전달하고, canonical reload로 원문이 없으면 저장된
+sanitized condition만으로 첫 검색을 계속한다. 검색 adapter는 사용 가능한 자연어와
+CHOICE chip을 합쳐 다음 중 하나의 vector snapshot을 만든 뒤 원문을 폐기한다.
 
 - `local-hash-cosine-v1`, 64차원
 - `openai-text-embedding-3-small-v1`, 1536차원
 
 Run에는 sanitized input, vector, `sha256:<64 lowercase hex>` fingerprint만 저장한다.
-교체는 이 세 값을 그대로 사용한다. 30분 → 45분 승인은 승인된 sanitized
+교체는 이 세 값을 그대로 사용한다. 런타임 완화 승인은 승인된 sanitized
 runtime과 기존 vector로 서버가 새 fingerprint를 계산한 뒤 continuation을
 검증한다. raw text, token, matched term은 재구성하거나 저장하지 않는다.
 
 ## Persistence
 
 v0.7 baseline migration은 그대로 유지하고, v0.8 migration에서 catalog/vector 추가와
-Run staging nullability·lifecycle CHECK를 비파괴적으로 적용한다.
+Run staging nullability·lifecycle CHECK를 비파괴적으로 적용한다. v0.9 multiturn
+migration은 FAMILY/RUNTIME 승인 shape으로 CHECK를 교체하며, 후속 atomic-hardening
+migration이 이를 명시적 transaction 안에서 원자적으로 재정립하고 JSON predicate를
+fail closed한다. 후속 migration은 원본 v0.9 실패 구간을 소급 원자화하지 않는다.
 활성 모델은 다음 여섯 개다.
 
 - `RecommendationRun`, `AgentTrace`
@@ -116,9 +157,16 @@ Run별 원자적 sequence, append-only Trace를 함께 반영하며 일부만 �
 상세 필드와 migration 원칙은 [`ERD-v0.8-live.md`](./ERD-v0.8-live.md)를 따른다.
 
 최초 추천은 sanitized request만 있는 `RUNNING`을 먼저 저장한 뒤 실행한다.
-terminal/승인 상태는 실제 mode·fingerprint·vector·response를 갖추고, 실패는 raw
+terminal/runtime 승인 상태는 실제 mode·fingerprint·vector·response를 갖추고, 실패는 raw
 오류 없이 `FAILED + INTERNAL_ERROR`로 저장한다. 승인 실행은 먼저 RUNNING CAS를
 성공한 한 요청만 계속하며, 완료/실패와 Trace를 다시 원자 커밋한다.
+
+`AWAITING_APPROVAL`에는 두 가지 멀티턴 shape이 있다. 검색 전 가족 구성 질문은
+`FAMILY_COMPOSITION` proposal과 sanitized condition만 가지며 mode·fingerprint·vector가
+아직 없다. 검색 후 후보 부족 제안은 `RUNTIME_RELAXATION` proposal과 실제 검색
+continuation을 모두 가진다. 둘 다 같은 revision CAS와 Trace transaction 경계를
+사용하고, 자연어 원문은 후속 답변에서도 일시적으로만 전달되어 Run에 저장되지
+않는다.
 
 ## Catalog ingestion
 
@@ -137,7 +185,10 @@ TMDB key는 ingestion에서만 필요하다. runtime 추천은 TMDB 응답이나
 
 ## HTTP, privacy, and errors
 
-공개 endpoint는 `MVP_API_ENDPOINTS`의 여섯 개뿐이며 익명 Run 목록은 없다.
+공개 HTTP endpoint는 총 8개다. `MVP_API_ENDPOINTS`에는 추천·health/reset core
+6개가 있고, `/api/ads`와 `/api/ads/events`는 별도 advertising contract를 사용한다.
+광고는 fictional static Demo fixture이고 현재 profile gate나 persistence가 없다.
+익명 Run 목록은 없다.
 공개 오류는 `BAD_REQUEST`, `NOT_FOUND`, `INTERNAL_ERROR`만 사용하고 stack,
 DB/provider 원문, secret을 노출하지 않는다.
 

@@ -16,9 +16,17 @@ import type {
 import { RESULT_LIMIT } from "../../config/recommendation";
 import { filterMvpCatalog } from "../catalog/filtering";
 import type { ExecutionAttempt } from "./executors/types";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number =>
   Math.max(0, Math.min(1, value));
+
+const hasTasteSignals = (input: SanitizedRecommendationSearchInput): boolean =>
+  input.moods.length > 0 ||
+  input.desiredGenres.length > 0 ||
+  input.hasNaturalLanguage ||
+  input.originPreference !== "ANY" ||
+  input.companions.some((companion) => companion !== "ANY");
 
 const matchRatio = (
   actual: readonly string[],
@@ -94,7 +102,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 기대치가 높아요.");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 function scoreEligibleCatalog(
@@ -105,6 +113,7 @@ function scoreEligibleCatalog(
   const companions = input.companions.filter(
     (companion) => companion !== "ANY",
   );
+  const showMatchPercent = hasTasteSignals(input);
 
   const scored = contents.map((content): RecommendationItem => {
     const mood = matchRatio(content.moodTags, input.moods, 0.5);
@@ -149,7 +158,7 @@ function scoreEligibleCatalog(
     return {
       content,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent: showMatchPercent ? Math.round(total * 100) : null,
       scoreBreakdown,
       reasons: buildReasons(content, input, quality),
     };
@@ -179,7 +188,8 @@ function scoreEligibleCatalog(
     return {
       ...item,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent:
+        item.matchPercent === null ? null : Math.round(total * 100),
       scoreBreakdown: {
         ...item.scoreBreakdown,
         diversityPenalty,

@@ -1,10 +1,15 @@
 import type {
   BudgetSnapshot,
   FallbackReason,
+  MvpClarificationAnswer,
+  MvpFamilyClarificationProposal,
   MvpRecommendationExecutionResult,
   RuleBasedFallbackInput,
 } from "../../../contracts/mvp-recommendation";
-import type { RecommendationSearchInvocation } from "../../../contracts/mvp-search";
+import type {
+  RecommendationSearchInvocation,
+  TransientRecommendationSearchInput,
+} from "../../../contracts/mvp-search";
 import type { RecommendationItem } from "../../../contracts/recommendation";
 import type { BudgetCounter } from "../budget";
 
@@ -62,6 +67,16 @@ export interface MvpRecommendationExecutionContext {
 }
 
 export interface MvpRecommendationExecutor {
+  prepareInitial?(
+    input: TransientRecommendationSearchInput,
+  ): {
+    input: TransientRecommendationSearchInput;
+    clarification: MvpFamilyClarificationProposal | null;
+  };
+  resolveFamilyClarification?(
+    input: TransientRecommendationSearchInput,
+    answer: MvpClarificationAnswer,
+  ): TransientRecommendationSearchInput;
   execute(
     context: MvpRecommendationExecutionContext,
   ): Promise<ExecutionAttempt>;

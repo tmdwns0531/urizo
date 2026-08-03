@@ -5,6 +5,13 @@
 - Demo 제품 기본선: docs/OTT-DAMOA-MVP-v0.6.md
 - 익명 실행 계약 기본선: docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md
 
+> **v0.9 supersession note (2026-08-03):** `AWAITING_APPROVAL`의 모든 실행
+> 필드가 항상 materialized된다는 아래 규칙은 runtime 승인에는 유지되지만,
+> 검색 전 `FAMILY_COMPOSITION` 질문에는 적용되지 않는다. 그 상태의
+> `executionMode`, `inputFingerprint`, `queryVector`는 모두 null이고, runtime
+> 승인 상태에서는 모두 non-null이다. ordered migration과
+> `docs/V09-MIGRATION-ATOMICITY-REVIEW.md`가 배포 review 기준이다.
+
 ## 1. 목적과 우선순위
 
 v0.8은 자격 증명 없이 실행되는 v0.6 Demo를 폐기하지 않고 다음 LIVE

@@ -173,25 +173,208 @@ test("natural language source text never enters the sanitized search input", asy
 });
 
 // UX-01
-test("CHOICE shows static order guidance, not a fake progress stepper", async () => {
-  const source = await readSource("src/app/choice/page.tsx");
-  assert.ok(!source.includes("choice-progress"), "stepper markup must be gone");
-  assert.ok(!source.includes("is-active"), "hardcoded active step must be gone");
-  assert.ok(!source.includes("추천 진행 1단계"), "fake progress label must be gone");
-  assert.ok(source.includes("이렇게 진행돼요"), "order guidance must be present");
+test("CHOICE renders a real state-driven progress stepper", async () => {
+  const page = await readSource("src/app/choice/page.tsx");
+  const entry = await readSource("src/components/choice-form.tsx");
+  const stepper = await readSource(
+    "src/components/choice-stepper/choice-stepper.tsx",
+  );
+  const progress = await readSource(
+    "src/components/choice-stepper/progress-bar.tsx",
+  );
 
-  const css = await readSource("src/app/globals.css");
-  assert.ok(!css.includes(".choice-progress"), "stepper CSS must be removed");
-  assert.ok(css.includes(".choice-guide"), "guidance CSS must exist");
+  assert.ok(page.includes("<ChoiceForm"), "route must render the CHOICE entry");
+  assert.ok(entry.includes("<ChoiceStepper"), "entry must render the stepper");
+  assert.ok(
+    stepper.includes("useState<ChoiceStep>(") &&
+      stepper.includes("initialHandoff ? 6 : 1"),
+    "stepper must own currentStep and honor a one-time structured handoff",
+  );
+  assert.ok(
+    stepper.includes("<ProgressBar currentStep={currentStep}"),
+    "progress must follow the current step instead of a hardcoded active item",
+  );
+  assert.ok(
+    progress.includes('role="progressbar"'),
+    "progress must expose progressbar semantics",
+  );
+  assert.ok(
+    progress.includes("aria-valuenow={currentStep}"),
+    "announced progress must follow currentStep",
+  );
 });
 
 // UX-02
-test("CHOICE summary surfaces the natural-language request and its relationship", async () => {
-  const source = await readSource("src/components/choice-form.tsx");
-  assert.ok(source.includes("추가 요청"), "summary must list the natural-language request");
+test("CHOICE summary contains only the structured step selections", async () => {
+  const summary = await readSource(
+    "src/components/choice-stepper/step-6-summary.tsx",
+  );
+  const state = await readSource(
+    "src/components/choice-stepper/choice-state.ts",
+  );
+  for (const field of [
+    "누구와",
+    "시청 시간",
+    "이용 OTT",
+    "원하는 느낌",
+    "취향 더하기",
+    "제작 지역",
+    "선호 장르",
+  ]) {
+    assert.ok(summary.includes(field), `summary must show ${field}`);
+  }
+  for (const removed of ["추가 요청", "피하는 장르", "시연 흐름"]) {
+    assert.ok(!summary.includes(removed), `${removed} must be removed`);
+  }
+  assert.ok(!state.includes("naturalLanguage"));
+  assert.ok(!state.includes("scenario"));
+});
+
+test("child rating copy matches the maximum allowed rating filter", async () => {
+  const [stepOne, summary, canonical, naturalAge, naturalLanguage, naturalResult] =
+    await Promise.all([
+      readSource("src/components/choice-stepper/step-1-who.tsx"),
+      readSource("src/components/choice-stepper/step-6-summary.tsx"),
+      readSource("src/components/recommendation-view.tsx"),
+      readSource("src/components/natural-recommendation/natural-age-step.tsx"),
+      readSource("src/components/natural-recommendation/natural-language.ts"),
+      readSource("src/components/natural-recommendation/natural-result.tsx"),
+    ]);
+
+  assert.ok(stepOne.includes("선택한 관람 등급을 최대 허용 기준으로 결과 필터에 직접"));
+  assert.ok(summary.includes("최대 허용 관람등급:"));
+  assert.ok(canonical.includes("고른 관람 등급을 최대 허용 기준으로 결과 필터에"));
+  assert.ok(canonical.includes("선택한 최대 허용 관람등급을 포함한 모든 조건으로"));
+  assert.ok(naturalAge.includes("선택한 관람 등급을 최대 허용"));
+  assert.ok(naturalLanguage.includes("최대 허용 관람등급으로 결과 필터에 적용했어요"));
+  assert.ok(naturalResult.includes("가족 구성을 확인한 뒤, 아이 동반이면 고른 관람 등급을"));
+  assert.ok(naturalResult.includes("결과 필터에 적용했고, 직접 말한 조건과 기본값을"));
+  assert.ok(naturalResult.includes("선택한 최대 허용 관람등급을 포함한 모든 조건으로"));
+
+  const allCopy = [stepOne, summary, naturalAge, naturalLanguage].join("\n");
+  for (const staleCopy of [
+    "결과 필터에 직접 반영하지",
+    "현재 결과 필터에 직접 반영되지",
+    "아이 동반 공통 기준",
+    "공통 안전 기준",
+  ]) {
+    assert.ok(!allCopy.includes(staleCopy), `stale child-rating copy remains: ${staleCopy}`);
+  }
+});
+
+test("approval copy does not promise a fixed result count", async () => {
+  const source = await readSource("src/components/recommendation-view.tsx");
+  assert.ok(!source.includes("5편 예상"), "approval must not promise five results");
   assert.ok(
-    source.includes("덮어쓰지 않고"),
-    "summary must explain that chips are not overwritten",
+    source.includes("response.proposal.currentMaxMinutes"),
+    "approval must render the current runtime from the proposal",
+  );
+  assert.ok(
+    source.includes("response.proposal.proposedMaxMinutes"),
+    "approval must render the proposed runtime from the proposal",
+  );
+});
+
+test("canonical result renders and submits every family clarification answer", async () => {
+  const source = await readSource("src/components/recommendation-view.tsx");
+  assert.ok(
+    source.includes("response.proposal.answers.map"),
+    "family clarification must render its answer list",
+  );
+  assert.ok(
+    source.includes("onClarification(answer.value)"),
+    "each family answer must remain actionable",
+  );
+  assert.match(
+    source,
+    /body:\s*JSON\.stringify\(\{\s*answer\s*\}\)/,
+    "canonical result must submit the clarification answer",
+  );
+});
+
+test("mobile recommendation action submits the active CHOICE form", async () => {
+  const form = await readSource(
+    "src/components/choice-stepper/choice-stepper.tsx",
+  );
+  const navigation = await readSource(
+    "src/components/choice-stepper/step-navigation.tsx",
+  );
+  const resultsPage = await readSource(
+    "src/app/recommendations/[runId]/page.tsx",
+  );
+  const css = await readSource("src/app/globals.css");
+
+  assert.ok(form.includes('id="choice-form"'), "CHOICE form must have a stable id");
+  assert.ok(form.includes("onSubmit="), "CHOICE form must handle semantic submit");
+  assert.ok(
+    navigation.includes('type="submit"'),
+    "summary action must submit the active CHOICE form",
+  );
+  assert.ok(
+    navigation.includes("추천 시작하기"),
+    "summary action must use the final recommendation label",
+  );
+  assert.ok(
+    navigation.includes("currentStep === 6"),
+    "submit action must only replace navigation on the summary step",
+  );
+  assert.ok(
+    resultsPage.includes('active="results"'),
+    "results must render the new-recommendation action",
+  );
+  const actionRule = css.match(/\.choice-stepper-actions\s*\{([^}]*)\}/s)?.[1];
+  assert.ok(actionRule, "stepper action styling must exist");
+  assert.match(
+    actionRule,
+    /position:\s*fixed/,
+    "stepper actions must remain reachable at the viewport bottom",
+  );
+});
+
+test("starting a new recommendation warns before discarding a CHOICE draft", async () => {
+  const form = await readSource(
+    "src/components/choice-stepper/choice-stepper.tsx",
+  );
+  const navigation = await readSource(
+    "src/components/choice-stepper/choice-nav.tsx",
+  );
+
+  assert.ok(
+    form.includes("data-choice-dirty="),
+    "CHOICE must expose whether the user has entered conditions",
+  );
+  assert.ok(
+    navigation.includes("입력한 조건이 초기화됩니다"),
+    "leaving or restarting CHOICE must explain the reset",
+  );
+  assert.ok(
+    navigation.includes("window.confirm("),
+    "leaving or restarting a dirty draft must ask for confirmation",
+  );
+});
+
+test("fully neutral recommendations are blocked in both UI and orchestration", async () => {
+  const state = await readSource(
+    "src/components/choice-stepper/choice-state.ts",
+  );
+  const ottStep = await readSource(
+    "src/components/choice-stepper/step-3-ott.tsx",
+  );
+  const orchestrator = await readSource(
+    "src/domains/recommendation/orchestrator.ts",
+  );
+
+  assert.ok(
+    state.includes("state.otts.length > 0"),
+    "CHOICE must require a meaningful OTT selection before summary",
+  );
+  assert.ok(
+    ottStep.includes("최소 1개 이상 선택"),
+    "CHOICE must explain the mandatory OTT condition",
+  );
+  assert.ok(
+    orchestrator.includes("requireMeaningfulChoice: true"),
+    "server orchestration must enforce the same policy",
   );
 });
 
@@ -215,6 +398,25 @@ test("CHOICE and landing copy carry no developer-facing terminology", async () =
     "src/app/page.tsx",
     "src/app/choice/page.tsx",
     "src/components/choice-form.tsx",
+    "src/components/choice-stepper/choice-nav.tsx",
+    "src/components/choice-stepper/choice-options.ts",
+    "src/components/choice-stepper/choice-stepper.tsx",
+    "src/components/choice-stepper/progress-bar.tsx",
+    "src/components/choice-stepper/step-1-who.tsx",
+    "src/components/choice-stepper/step-2-time.tsx",
+    "src/components/choice-stepper/step-3-ott.tsx",
+    "src/components/choice-stepper/step-4-mood.tsx",
+    "src/components/choice-stepper/step-5-extra.tsx",
+    "src/components/choice-stepper/step-6-summary.tsx",
+    "src/components/choice-stepper/step-navigation.tsx",
+    "src/components/landing/landing-page.tsx",
+    "src/components/landing/landing-nav.tsx",
+    "src/components/landing/landing-hero.tsx",
+    "src/components/landing/recommendation-showcase.tsx",
+    "src/components/landing/supported-provider-strip.tsx",
+    "src/components/landing/landing-features.tsx",
+    "src/components/landing/landing-footer.tsx",
+    "src/components/landing/landing-data.ts",
   ]) {
     const source = await readSource(file);
     for (const term of banned) {
@@ -225,10 +427,10 @@ test("CHOICE and landing copy carry no developer-facing terminology", async () =
     }
   }
 
-  const form = await readSource("src/components/choice-form.tsx");
-  assert.ok(form.includes("시연 모드"), "Demo Lab must be relabelled, not deleted");
-  assert.ok(
-    form.includes("scenarioOptions"),
-    "Demo Lab scenarios must remain available",
+  const extraStep = await readSource(
+    "src/components/choice-stepper/step-5-extra.tsx",
   );
+  assert.ok(!extraStep.includes("시연 모드"));
+  assert.ok(!extraStep.includes("SCENARIO_OPTIONS"));
+  assert.ok(!extraStep.includes("추가 요청 및 시연 설정"));
 });

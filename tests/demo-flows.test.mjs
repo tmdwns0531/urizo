@@ -125,8 +125,32 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
     const html = await response.text();
     assert.match(html, /OTT 다모아/);
     assert.match(html, /오늘 볼 작품/);
-    assert.match(html, /로그인 없이 시작/);
+    assert.match(html, /지금 상황 반영/);
+    assert.match(html, /<nav\b/i);
+    assert.match(html, /<main\b/i);
+    assert.match(html, /<footer\b/i);
+    assert.match(html, /href="\/choice"/i);
+    assert.match(html, /조건 골라 추천받기/);
+    assert.match(html, /문장으로 추천받기/);
+    assert.match(html, /href="\/prompt"/i);
+    assert.doesNotMatch(
+      html,
+      /href="\/(?:login|signup|profile|my|saved|watched|community)(?:[/?#"])/i,
+    );
     assert.doesNotMatch(html, /Your site is taking shape|Starter Project/);
+  });
+
+  await t.test("renders the natural-language recommendation entry", async () => {
+    const response = await request("/prompt", {
+      headers: { accept: "text/html" },
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+    const html = await response.text();
+    assert.match(html, /한마디 추천/);
+    assert.match(html, /지금 보고 싶은 작품/);
+    assert.match(html, /natural-request/);
+    assert.doesNotMatch(html, /로그인|회원가입|SIGN IN/i);
   });
 
   await t.test("reports the complete credential-free Demo preset", async () => {
@@ -171,6 +195,31 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
     assert.deepEqual(recommendationIds(fetched.body), recommendationIds(created));
   });
 
+  await t.test("accepts the exact payload produced by the Choice form", async () => {
+    await resetDemo();
+    const created = await createRecommendation(
+      {
+        choice: {
+          selectedProviders: ["NETFLIX", "TVING"],
+          companions: ["ALONE"],
+          moods: ["밝은"],
+          maxRuntimeMinutes: 120,
+          originPreference: "ANY",
+          desiredGenres: [],
+          explicitlyRequestedGenres: [],
+          companionAvoidGenres: [],
+        },
+      },
+      "Choice form run",
+    );
+
+    const fetched = await jsonRequest(
+      `/api/recommendations/${encodeURIComponent(created.runId)}`,
+    );
+    assertStatus(fetched, 200, "fetch Choice form run");
+    assert.equal(fetched.body.runId, created.runId);
+  });
+
   await t.test("rejects unknown fields and oversized natural language", async () => {
     const unknown = await jsonRequest("/api/recommendations", {
       method: "POST",
@@ -195,6 +244,16 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
     assert.match(oversizedBody.body.error, /바이트/);
   });
 
+  await t.test("rejects a recommendation with no meaningful condition", async () => {
+    const neutral = await jsonRequest("/api/recommendations", {
+      method: "POST",
+      json: { choice: {} },
+    });
+    assertStatus(neutral, 400, "neutral recommendation request");
+    assert.equal(neutral.body.code, "BAD_REQUEST");
+    assert.match(neutral.body.error, /추천 조건을 하나 이상/);
+  });
+
   await t.test("never returns the natural-language source in Run or Trace", async () => {
     await resetDemo();
     const canary = "PRIVATE-NATURAL-LANGUAGE-CANARY-7429";
@@ -208,6 +267,31 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
       `/api/recommendations/${encodeURIComponent(created.runId)}`,
     );
     assert.doesNotMatch(JSON.stringify(fetched.body), new RegExp(canary));
+  });
+
+  await t.test("continues one Agent clarification turn through the approval endpoint", async () => {
+    await resetDemo();
+    const source = "가족과 따뜻한 작품을 보고 싶어";
+    const awaiting = await createRecommendation(
+      { choice: { naturalLanguage: source } },
+      "Agent clarification run",
+    );
+    assert.equal(awaiting.status, "awaiting_approval");
+    assert.equal(awaiting.proposal.kind, "FAMILY_COMPOSITION");
+    assert.equal(awaiting.partialRecommendations.length, 0);
+    assert.doesNotMatch(JSON.stringify(awaiting), new RegExp(source));
+
+    const answered = await jsonRequest(
+      `/api/recommendations/${encodeURIComponent(awaiting.runId)}/approval`,
+      {
+        method: "POST",
+        json: { answer: "ADULTS_ONLY", naturalLanguage: source },
+      },
+    );
+    assertStatus(answered, 200, "answer Agent clarification");
+    assert.equal(answered.body.status, "completed");
+    assert.equal(answered.body.recommendations.length, 5);
+    assert.doesNotMatch(JSON.stringify(answered.body), new RegExp(source));
   });
 
   await t.test("requires approval before a 30 to 45 minute relaxation", async () => {

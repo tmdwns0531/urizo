@@ -65,15 +65,41 @@ export const MVP_BUDGET_LIMITS = {
   elapsedMs: 25_000,
 } as const;
 
-export interface MvpApprovalProposal {
+export interface MvpRuntimeRelaxationProposal {
   kind: "RUNTIME_RELAXATION";
-  currentMaxMinutes: 30;
-  proposedMaxMinutes: 45;
+  currentMaxMinutes: number;
+  proposedMaxMinutes: number;
   currentCandidateCount: number;
   question: string;
   approveLabel: string;
   rejectLabel: string;
 }
+
+export const MVP_CLARIFICATION_ANSWERS = [
+  // WITH_CHILDREN is accepted only for safe continuation of pre-upgrade Runs.
+  "WITH_CHILDREN",
+  "ADULTS_ONLY",
+  "CHILD_ALL",
+  "CHILD_7",
+  "CHILD_12",
+  "CHILD_15",
+] as const;
+
+export type MvpClarificationAnswer =
+  (typeof MVP_CLARIFICATION_ANSWERS)[number];
+
+export interface MvpFamilyClarificationProposal {
+  kind: "FAMILY_COMPOSITION";
+  question: string;
+  answers: Array<{
+    value: MvpClarificationAnswer;
+    label: string;
+  }>;
+}
+
+export type MvpApprovalProposal =
+  | MvpRuntimeRelaxationProposal
+  | MvpFamilyClarificationProposal;
 
 export type MvpApprovalDecision = "approve" | "reject";
 
@@ -149,6 +175,11 @@ export interface MvpPublicTraceEvent {
 
 interface MvpResponseBase {
   runId: string;
+  /**
+   * Human-readable projection of the persisted, sanitized CHOICE input.
+   * It never contains the transient natural-language source text.
+   */
+  conditionSummary: string;
   policyBlockedCount: number;
   trace: MvpPublicTraceEvent[];
   createdAt: string;
@@ -161,7 +192,16 @@ export interface MvpCompletedRecommendationResponse
   recommendations: RecommendationItem[];
   topPick: RecommendationItem | null;
   fallbackUsed: boolean;
+  noResult?: MvpNoResultState;
   notice?: string;
+}
+
+export interface MvpNoResultState {
+  code: "NO_MATCHING_CONTENT";
+  message: string;
+  availableActions: Array<
+    "EXTEND_RUNTIME" | "ALLOW_ANY_MEDIA_TYPE" | "REENTER_CONDITIONS"
+  >;
 }
 
 export interface MvpAwaitingApprovalRecommendationResponse
@@ -177,8 +217,11 @@ export type MvpRecommendationResponse =
   | MvpAwaitingApprovalRecommendationResponse;
 
 export type StoredResponseSnapshot =
-  | Omit<MvpCompletedRecommendationResponse, "trace">
-  | Omit<MvpAwaitingApprovalRecommendationResponse, "trace">;
+  | Omit<MvpCompletedRecommendationResponse, "trace" | "conditionSummary">
+  | Omit<
+      MvpAwaitingApprovalRecommendationResponse,
+      "trace" | "conditionSummary"
+    >;
 
 export interface SelectorOutput {
   selectedIds: string[];
@@ -278,8 +321,15 @@ export function assertStoredRecommendationRunState(
   }
 
   if (run.status === "AWAITING_APPROVAL") {
+    const awaitingFamilyClarification =
+      run.responseSnapshot?.status === "awaiting_approval" &&
+      run.responseSnapshot.proposal.kind === "FAMILY_COMPOSITION";
     if (
-      !materialized ||
+      (awaitingFamilyClarification
+        ? run.executionMode !== null ||
+          run.inputFingerprint !== null ||
+          run.queryVector !== null
+        : !materialized) ||
       run.responseSnapshot?.status !== "awaiting_approval" ||
       run.errorCode !== null ||
       run.completedAt !== null
@@ -332,7 +382,8 @@ export interface AnonymousRecommendationServices {
   getRun(runId: string): Promise<MvpRecommendationResponse | null>;
   decideApproval(
     runId: string,
-    decision: MvpApprovalDecision,
+    decision: MvpApprovalDecision | MvpClarificationAnswer,
+    naturalLanguage?: import("./mvp-search").NaturalLanguage140,
   ): Promise<MvpRecommendationResponse>;
   replace(
     runId: string,

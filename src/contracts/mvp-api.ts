@@ -1,5 +1,6 @@
 import type {
   ErrorResponse,
+  MvpClarificationAnswer,
   MvpApprovalDecision,
   MvpCompletedRecommendationResponse,
   MvpRecommendationResponse,
@@ -9,9 +10,12 @@ import type {
   MvpRecommendationRequest,
 } from "./mvp-search";
 
-export interface ApprovalRequest {
-  decision: MvpApprovalDecision;
-}
+export type ApprovalRequest =
+  | { decision: MvpApprovalDecision }
+  | {
+      answer: MvpClarificationAnswer;
+      naturalLanguage?: string;
+    };
 
 export interface ReplacementRequest {
   contentId: string;

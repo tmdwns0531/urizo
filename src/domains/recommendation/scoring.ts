@@ -12,8 +12,16 @@ import {
   RECOMMENDATION_WEIGHTS,
   type RecommendationWeights,
 } from "../../config/recommendation";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+
+const hasTasteSignals = (input: SanitizedRecommendationSearchInput): boolean =>
+  input.moods.length > 0 ||
+  input.desiredGenres.length > 0 ||
+  input.hasNaturalLanguage ||
+  input.originPreference !== "ANY" ||
+  input.companions.some((companion) => companion !== "ANY");
 
 const matchRatio = (
   actual: readonly string[],
@@ -91,7 +99,8 @@ function applyDiversityPenalty(
     return {
       ...item,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent:
+        item.matchPercent === null ? null : Math.round(total * 100),
       scoreBreakdown: {
         ...item.scoreBreakdown,
         diversityPenalty,
@@ -146,7 +155,7 @@ function buildMvpReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /**
@@ -170,6 +179,7 @@ export function scoreMvpSearchResults(
       ? withoutGenreWeight(configuredWeights)
       : configuredWeights;
   const qualityScores = normalizeQuality(results);
+  const showMatchPercent = hasTasteSignals(input);
 
   const initial = results.map((result): RecommendationItem => {
     const content = result.content;
@@ -207,7 +217,9 @@ export function scoreMvpSearchResults(
     return {
       content,
       score: scoreBreakdown.total,
-      matchPercent: Math.round(scoreBreakdown.total * 100),
+      matchPercent: showMatchPercent
+        ? Math.round(scoreBreakdown.total * 100)
+        : null,
       scoreBreakdown,
       reasons: buildMvpReasons(result, input, scoreBreakdown),
     };
@@ -256,7 +268,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /** @deprecated Use scoreMvpSearchResults for anonymous MVP code. */

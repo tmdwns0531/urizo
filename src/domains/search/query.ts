@@ -1,4 +1,7 @@
-import type { TransientRecommendationSearchInput } from "../../contracts/mvp-search";
+import type {
+  MediaTypePreference,
+  TransientRecommendationSearchInput,
+} from "../../contracts/mvp-search";
 import type { SearchInput } from "../../contracts/search";
 
 const MOOD_COPY: Record<string, string> = {
@@ -25,6 +28,8 @@ interface SearchQueryParts {
   companions: readonly string[];
   moods: readonly string[];
   desiredGenres: readonly string[];
+  requiredGenres?: readonly string[];
+  mediaType?: MediaTypePreference;
   maxRuntimeMinutes: number | null;
   originPreference: "KR" | "NON_KR" | "ANY";
   naturalLanguage: string;
@@ -38,7 +43,18 @@ function buildStructuredSearchQuery(input: SearchQueryParts): string {
   const mood = input.moods
     .map((item) => MOOD_COPY[item] ?? `${item} 분위기의 작품`)
     .join(", ");
-  const genres = input.desiredGenres.join(", ");
+  const genres = [
+    ...new Set([
+      ...input.desiredGenres,
+      ...(input.requiredGenres ?? []),
+    ]),
+  ].join(", ");
+  const mediaType =
+    input.mediaType === "MOVIE"
+      ? "영화"
+      : input.mediaType === "SERIES"
+        ? "시리즈"
+        : "";
   const duration =
     input.maxRuntimeMinutes === null
       ? ""
@@ -50,7 +66,7 @@ function buildStructuredSearchQuery(input: SearchQueryParts): string {
         ? "해외 작품"
         : "";
 
-  return [companion, duration, origin, mood, genres]
+  return [companion, mediaType, duration, origin, mood, genres]
     .filter(Boolean)
     .join(" ")
     .trim();

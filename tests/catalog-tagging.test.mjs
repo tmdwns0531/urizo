@@ -200,3 +200,18 @@ test("CAT-01: 픽스처 id 와 tmdbId 가 고유하다", async () => {
   assert.equal(new Set(ids).size, ids.length, "id 가 중복된다");
   assert.equal(new Set(tmdbIds).size, tmdbIds.length, "tmdbId 가 중복된다");
 });
+
+test("CAT-01: 심야식당은 canonical TMDB 작품과 포스터를 사용한다", async () => {
+  const { DEMO_CATALOG } = await loadModule("src/demo/fixtures/catalog.ts");
+  const midnightDiner = DEMO_CATALOG.find(
+    (item) => item.id === "midnight-diner",
+  );
+
+  assert.ok(midnightDiner, "심야식당 fixture가 있어야 한다");
+  assert.equal(midnightDiner.title, "심야식당");
+  assert.equal(midnightDiner.tmdbId, 47008);
+  assert.equal(
+    midnightDiner.posterUrl,
+    "https://image.tmdb.org/t/p/w500/4a4BE3OgS3slYh1U4lCJAh7ZKVr.jpg",
+  );
+});

@@ -168,7 +168,7 @@ function renderTopPickReason(evidence: TopPickEvidence): string | undefined {
   if (evidence.genre !== null) {
     appendReasonPart(
       parts,
-      `${evidence.genre} \uc7a5\ub974 \ucde8\ud5a5\uc5d0 \uc798 \ub9de\uc544\uc694.`,
+      `${evidence.genre} \uc7a5\ub974\uc758 \uc791\ud488\uc774\uc5d0\uc694.`,
     );
   }
   if (evidence.provider !== null) {

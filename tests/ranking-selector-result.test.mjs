@@ -114,6 +114,35 @@ const MOOD_REASON = /분위기와 잘 맞아요/;
  */
 const REQUIRED_SAFE_INVENTORY = 6;
 
+test("일반 점수 계산은 추천 이유를 2~3개로 보장한다", async () => {
+  const { scoreMvpSearchResults } = await loadModule(
+    "src/domains/recommendation/scoring.ts",
+  );
+
+  const [item] = scoreMvpSearchResults(
+    [
+      {
+        content: content({ genres: [], moodTags: [] }),
+        semanticScore: 0.5,
+      },
+    ],
+    searchInput({
+      companions: ["ANY"],
+      moods: [],
+      desiredGenres: [],
+      maxRuntimeMinutes: null,
+    }),
+  );
+
+  assert.ok(item.reasons.length >= 2, "추천 이유는 최소 2개여야 한다");
+  assert.ok(item.reasons.length <= 3, "추천 이유는 최대 3개여야 한다");
+  assert.equal(
+    new Set(item.reasons).size,
+    item.reasons.length,
+    "추천 이유가 중복되면 안 된다",
+  );
+});
+
 test("mood 일치 작품이 불일치 작품보다 mood 점수가 높다", async () => {
   const { scoreMvpSearchResults } = await loadModule(
     "src/domains/recommendation/scoring.ts",

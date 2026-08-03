@@ -1,0 +1,26 @@
+import { SUPPORTED_PROVIDERS } from "./landing-data";
+
+export function SupportedProviderStrip() {
+  return (
+    <section
+      className="cinema-provider-strip overflow-hidden border-b border-white/10 bg-[#0d1218] py-6 sm:py-8"
+      aria-labelledby="provider-strip-title"
+    >
+      <div className="app-container flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="shrink-0 text-center lg:text-left">
+          <h2 id="provider-strip-title" className="text-sm font-bold tracking-[0.12em] text-slate-300">
+            이용 중인 OTT만 골라서
+          </h2>
+          <p className="mt-1 text-base leading-7 text-slate-400">선택한 서비스의 조건을 추천에 반영해요</p>
+        </div>
+        <ul className="cinema-provider-list flex w-full flex-wrap items-center justify-center gap-x-6 gap-y-3 sm:gap-x-9 lg:w-auto lg:justify-end">
+          {SUPPORTED_PROVIDERS.map((provider) => (
+            <li key={provider} className="text-sm font-extrabold tracking-[-0.02em] text-slate-300 sm:text-base">
+              {provider}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}

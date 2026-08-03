@@ -60,8 +60,8 @@ const makeContent = (input: FixtureInput): CatalogContent => ({
 export const DEMO_CATALOG: readonly CatalogContent[] = [
   makeContent({
     id: "midnight-diner",
-    tmdbId: 61488,
-    poster: "/2ybwRRpPqAwRca6S2qqXk2MjmW2.jpg",
+    tmdbId: 47008,
+    poster: "/4a4BE3OgS3slYh1U4lCJAh7ZKVr.jpg",
     title: "심야식당",
     synopsis: "늦은 밤 작은 식당에 모인 사람들의 음식과 위로 이야기",
     type: "SERIES",

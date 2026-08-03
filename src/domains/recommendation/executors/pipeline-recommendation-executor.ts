@@ -20,6 +20,7 @@ import { filterMvpCatalog } from "../../catalog/filtering";
 import {
   BudgetExceededError,
 } from "../budget";
+import { ensureRecommendationReasons } from "../reasons";
 import { scoreMvpSearchResults } from "../scoring";
 import type {
   ExecutionAttempt,
@@ -58,7 +59,11 @@ const sanitizeSearchInput = (
   moods: [...input.moods],
   desiredGenres: [...input.desiredGenres],
   companionAvoidGenres: [...input.companionAvoidGenres],
+  requiredGenres: [...(input.requiredGenres ?? [])],
+  excludedGenres: [...(input.excludedGenres ?? [])],
+  mediaType: input.mediaType ?? "ANY",
   maxRuntimeMinutes: input.maxRuntimeMinutes,
+  childAgeRatingLimit: input.childAgeRatingLimit ?? null,
   originPreference: input.originPreference,
   hasNaturalLanguage: input.hasNaturalLanguage,
 });
@@ -174,20 +179,20 @@ function selectItems(
     if (!item) {
       throw new SelectorOutputValidationError();
     }
-    if (index !== 0 || output.topPickReason === undefined) {
+    if (index !== 0) {
       return item;
     }
 
-    const reasons = [
-      output.topPickReason.trim(),
-      ...item.reasons,
-    ].filter(
-      (reason, reasonIndex, allReasons) =>
-        allReasons.indexOf(reason) === reasonIndex,
-    );
+    const openAiReasons =
+      output.topPickReason === undefined
+        ? []
+        : [output.topPickReason];
     return {
       ...item,
-      reasons: reasons.slice(0, 3),
+      reasons: ensureRecommendationReasons(item.content, [
+        ...openAiReasons,
+        ...item.reasons,
+      ]),
     };
   });
 }

@@ -138,7 +138,7 @@ test("Prisma UoW keeps Run CAS, sequence allocation, and Trace writes in one tra
   );
   assert.equal(
     [...orchestrator.matchAll(/persistence\.updateRunWithTraceEvents/g)].length,
-    6,
+    9,
   );
   assert.doesNotMatch(orchestrator, /appendTraceEvents/);
 });
