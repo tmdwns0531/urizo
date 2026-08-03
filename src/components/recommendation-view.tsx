@@ -12,6 +12,11 @@ import type {
 import { RecommendationWaitingScreen } from "./advertising/recommendation-waiting-screen";
 import { SponsoredVideoAd } from "./advertising/sponsored-video-ad";
 import { ContentCard } from "./content-card";
+import {
+  ComparisonCandidate,
+  RecommendationComparisonTray,
+  useRecommendationComparisonSelection,
+} from "./content-comparison/recommendation-comparison-tray";
 import { RecommendationTimeline } from "./recommendation-timeline";
 
 type RecommendationViewProps = {
@@ -262,6 +267,12 @@ export function CompletedView({
   const alternatives = response.recommendations.filter(
     (item) => item.content.id !== response.topPick?.content.id,
   ).slice(0, 4);
+  const comparisonCandidates = response.topPick
+    ? [response.topPick.content, ...alternatives.map(({ content }) => content)]
+    : [];
+  const { selectedIds, toggle } =
+    useRecommendationComparisonSelection(comparisonCandidates);
+  const selectionFull = selectedIds.length >= 2;
 
   return (
     <>
@@ -335,15 +346,25 @@ export function CompletedView({
       {response.topPick ? (
         <section aria-labelledby="top-pick-heading">
           <h2 id="top-pick-heading" className="sr-only">가장 먼저 추천하는 작품</h2>
-          <ContentCard
-            item={response.topPick}
-            rank={1}
-            hero
-            conditionSummary={response.conditionSummary}
-            onReplace={onReplace}
-            replacing={replacingId === response.topPick.content.id}
-            replacementPending={replacingId !== null}
-          />
+          <ComparisonCandidate
+            content={response.topPick.content}
+            selected={selectedIds.includes(response.topPick.content.id)}
+            disabled={
+              selectionFull &&
+              !selectedIds.includes(response.topPick.content.id)
+            }
+            onToggle={toggle}
+          >
+            <ContentCard
+              item={response.topPick}
+              rank={1}
+              hero
+              conditionSummary={response.conditionSummary}
+              onReplace={onReplace}
+              replacing={replacingId === response.topPick.content.id}
+              replacementPending={replacingId !== null}
+            />
+          </ComparisonCandidate>
         </section>
       ) : (
         <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
@@ -382,15 +403,25 @@ export function CompletedView({
           <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:thin] md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-3 xl:grid-cols-5">
             {alternatives.length
               ? alternatives.map((item, index) => (
-                  <ContentCard
-                    item={item}
-                    rank={index + 2}
+                  <ComparisonCandidate
+                    content={item.content}
                     rail
+                    selected={selectedIds.includes(item.content.id)}
+                    disabled={
+                      selectionFull && !selectedIds.includes(item.content.id)
+                    }
+                    onToggle={toggle}
                     key={item.content.id}
-                    onReplace={onReplace}
-                    replacing={replacingId === item.content.id}
-                    replacementPending={replacingId !== null}
-                  />
+                  >
+                    <ContentCard
+                      item={item}
+                      rank={index + 2}
+                      key={item.content.id}
+                      onReplace={onReplace}
+                      replacing={replacingId === item.content.id}
+                      replacementPending={replacingId !== null}
+                    />
+                  </ComparisonCandidate>
                 ))
               : null}
             <div className="w-[min(76vw,17rem)] shrink-0 snap-center md:w-auto">
@@ -408,6 +439,11 @@ export function CompletedView({
       <div className="mt-8">
         <RecommendationTimeline response={response} />
       </div>
+      <RecommendationComparisonTray
+        contents={comparisonCandidates}
+        selectedIds={selectedIds}
+        onToggle={toggle}
+      />
     </>
   );
 }

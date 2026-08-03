@@ -13,6 +13,11 @@ import { SponsoredVideoAd } from "../advertising/sponsored-video-ad";
 import { useChoiceHandoff } from "../choice-handoff/choice-handoff-provider";
 import { ContentCard } from "../content-card";
 import {
+  ComparisonCandidate,
+  RecommendationComparisonTray,
+  useRecommendationComparisonSelection,
+} from "../content-comparison/recommendation-comparison-tray";
+import {
   ReplacementFeedbackNotice,
   type ReplacementFeedback,
 } from "../recommendation-view";
@@ -189,6 +194,12 @@ function CompletedNaturalResults({
   const alternatives = response.recommendations
     .filter((item) => item.content.id !== response.topPick?.content.id)
     .slice(0, 4);
+  const comparisonCandidates = response.topPick
+    ? [response.topPick.content, ...alternatives.map(({ content }) => content)]
+    : [];
+  const { selectedIds, toggle } =
+    useRecommendationComparisonSelection(comparisonCandidates);
+  const selectionFull = selectedIds.length >= 2;
   const approvedRuntimeMinutes = [...response.trace]
     .reverse()
     .find(
@@ -246,14 +257,24 @@ function CompletedNaturalResults({
       {response.topPick ? (
         <section aria-labelledby="natural-top-pick-title">
           <h2 id="natural-top-pick-title" className="sr-only">가장 먼저 추천하는 작품</h2>
-          <ContentCard
-            item={response.topPick}
-            rank={1}
-            hero
-            onReplace={onReplace}
-            replacing={replacingId === response.topPick.content.id}
-            replacementPending={replacingId !== null}
-          />
+          <ComparisonCandidate
+            content={response.topPick.content}
+            selected={selectedIds.includes(response.topPick.content.id)}
+            disabled={
+              selectionFull &&
+              !selectedIds.includes(response.topPick.content.id)
+            }
+            onToggle={toggle}
+          >
+            <ContentCard
+              item={response.topPick}
+              rank={1}
+              hero
+              onReplace={onReplace}
+              replacing={replacingId === response.topPick.content.id}
+              replacementPending={replacingId !== null}
+            />
+          </ComparisonCandidate>
         </section>
       ) : (
         <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
@@ -309,15 +330,25 @@ function CompletedNaturalResults({
           </div>
           <div className="mt-4 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 [scrollbar-width:thin] md:grid md:grid-cols-2 md:overflow-visible md:pb-0 lg:grid-cols-3 xl:grid-cols-5">
             {alternatives.map((item, index) => (
-              <ContentCard
-                item={item}
-                rank={index + 2}
+              <ComparisonCandidate
+                content={item.content}
                 rail
-                onReplace={onReplace}
-                replacing={replacingId === item.content.id}
-                replacementPending={replacingId !== null}
+                selected={selectedIds.includes(item.content.id)}
+                disabled={
+                  selectionFull && !selectedIds.includes(item.content.id)
+                }
+                onToggle={toggle}
                 key={item.content.id}
-              />
+              >
+                <ContentCard
+                  item={item}
+                  rank={index + 2}
+                  onReplace={onReplace}
+                  replacing={replacingId === item.content.id}
+                  replacementPending={replacingId !== null}
+                  key={item.content.id}
+                />
+              </ComparisonCandidate>
             ))}
             <div className="w-[min(76vw,17rem)] shrink-0 snap-center md:w-auto">
               <SponsoredVideoAd
@@ -330,6 +361,11 @@ function CompletedNaturalResults({
           </div>
         </section>
       ) : null}
+      <RecommendationComparisonTray
+        contents={comparisonCandidates}
+        selectedIds={selectedIds}
+        onToggle={toggle}
+      />
     </>
   );
 }
