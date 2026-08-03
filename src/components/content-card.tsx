@@ -3,6 +3,7 @@
 import type { RecommendationItem } from "@/contracts/recommendation";
 import { PosterArt } from "./poster-art";
 import { ProviderBadge } from "./provider-badge";
+import { WatchlistButton } from "./watchlist/watchlist-button";
 
 function ageLabel(ageRating: RecommendationItem["content"]["ageRating"]) {
   if (ageRating === "ALL") return "전체";
@@ -156,6 +157,7 @@ export function ContentCard({
                   {replacing ? "새 후보를 찾는 중…" : "다른 작품으로 바꾸기"}
                 </button>
               ) : null}
+              <WatchlistButton content={content} hero />
             </div>
 
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -233,17 +235,20 @@ export function ContentCard({
           ) : (
             <span className="text-sm font-bold text-slate-400">제공처 확인 중</span>
           )}
-          {onReplace ? (
-            <button
-              type="button"
-              className="grid size-10 place-items-center rounded-xl bg-white/5 text-base text-slate-300 transition hover:bg-orange-500/15 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-50"
-              onClick={() => onReplace(content.id)}
-              disabled={replacementPending}
-              aria-label={`${content.title} ${replacing ? "새 후보를 찾는 중" : "다른 작품으로 바꾸기"}`}
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            <WatchlistButton content={content} />
+            {onReplace ? (
+              <button
+                type="button"
+                className="grid size-10 place-items-center rounded-xl bg-white/5 text-base text-slate-300 transition hover:bg-orange-500/15 hover:text-orange-200 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:opacity-50"
+                onClick={() => onReplace(content.id)}
+                disabled={replacementPending}
+                aria-label={`${content.title} ${replacing ? "새 후보를 찾는 중" : "다른 작품으로 바꾸기"}`}
+              >
+                <span aria-hidden="true">↻</span>
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>

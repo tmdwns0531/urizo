@@ -481,6 +481,9 @@ test("v0.7 Run and Trace keep their accepted persistence contract", async () => 
   const erdEntityNames = [...erd.matchAll(/^\s{2}(\w+) \{$/gm)].map(
     (match) => match[1],
   );
+  // Account 와 WatchlistItem 은 v0.9 에서 승인받아 추가했다. 찜 목록이 사람에게
+  // 속하려면 계정이 있어야 하고, 브라우저 저장으로는 기기를 바꾸는 순간 사라진다.
+  // 익명 추천 경로는 이 두 표를 읽지 않고, 관람등급 판정도 계정과 무관하게 남는다.
   assert.deepEqual(modelNames, [
     "RecommendationRun",
     "AgentTrace",
@@ -488,6 +491,8 @@ test("v0.7 Run and Trace keep their accepted persistence contract", async () => 
     "ProviderAvailability",
     "ContentSearchDocument",
     "ContentEmbedding",
+    "Account",
+    "WatchlistItem",
   ]);
   assert.deepEqual(tableNames, ["recommendation_runs", "agent_traces"]);
   assert.deepEqual(erdEntityNames, ["RecommendationRun", "AgentTrace"]);

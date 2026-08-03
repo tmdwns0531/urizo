@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LandingAuth } from "./landing-auth";
 
 export function LandingNav() {
   return (
@@ -35,30 +36,7 @@ export function LandingNav() {
           </a>
         </div>
 
-        <div
-          className="ml-auto flex shrink-0 items-center text-sm font-extrabold text-slate-200"
-          aria-label="계정 기능 준비 중"
-        >
-          <button
-            type="button"
-            disabled
-            aria-label="회원가입 기능 준비 중"
-            title="회원가입 기능 준비 중"
-            className="inline-flex min-h-11 items-center px-2 transition-colors disabled:cursor-not-allowed disabled:opacity-100 sm:px-3"
-          >
-            회원가입
-          </button>
-          <span className="h-5 w-px bg-white/25" aria-hidden="true" />
-          <button
-            type="button"
-            disabled
-            aria-label="로그인 기능 준비 중"
-            title="로그인 기능 준비 중"
-            className="inline-flex min-h-11 items-center px-2 transition-colors disabled:cursor-not-allowed disabled:opacity-100 sm:px-3"
-          >
-            로그인
-          </button>
-        </div>
+        <LandingAuth />
       </nav>
     </header>
   );
