@@ -24,6 +24,7 @@ Run → 공개 Trace 흐름이다. 로그인, Profile, MY, 찜, 봤어요, 서�
 | catalog | fixture | Prisma catalog |
 | search | local 64차원 hash/cosine | OpenAI 1536차원 embedding + pgvector |
 | selector | deterministic | OpenAI structured selector |
+| contextual curator | deterministic questions | OpenAI text + vision interpretation |
 | Run store | memory | Prisma |
 | Trace store | memory | Prisma |
 
@@ -66,6 +67,7 @@ review한다.
 | public response, Run lifecycle, budget/fallback, Trace DTO | `src/contracts/mvp-recommendation.ts` |
 | catalog/search/selector/Run/Trace ports | `src/contracts/mvp-ports.ts`, `src/contracts/ports.ts` |
 | public API descriptors | `src/contracts/mvp-api.ts` |
+| transient contextual curator | `src/contracts/curator.ts`, `src/domains/curator/**`, `src/composition/curator.ts` |
 | policy-safe execution attempt | `src/domains/recommendation/executors/types.ts` |
 | preset, selector, conditional environment validation | `src/config/adapters.ts` |
 | concrete assembly | `src/composition/**` |
@@ -74,6 +76,42 @@ review한다.
 과거 `user.ts`, `engagement.ts`, `search.ts`, `recommendation.ts`의 타입이 남아
 있더라도 새 구현에서 사용하지 않는다. 삭제·호환 정리는 공용 계약 변경으로
 분리한다.
+
+## Contextual curator sequence
+
+우측 하단의 AI 큐레이터 `모아`는 `/choice`의 구조화 폼이나 `/prompt`의 단일 자연어
+요청을 복제하지 않는다. 사용자가 원하는 조건을 아직 모르거나, 현재 상황·기분을
+대화로 풀거나, 이미지의 색감·분위기에서 단서를 찾고 싶을 때 다음 흐름을 사용한다.
+
+```text
+browser-memory conversation + optional transient image
+-> strict curator request and image-signature validation
+-> deterministic Demo or one bounded LIVE OpenAI text/vision interpretation
+-> validated structured curator state + concise transient search query
+-> explicit user confirmation
+-> existing POST /api/recommendations
+-> existing search, ranking, selector, approval, and final policy flow
+```
+
+큐레이터는 catalog를 검색하거나 작품 ID·제목을 선택하지 않는다. `/api/curator/turn`은
+Run을 생성하지 않는 stateless endpoint이며, 현재 발화와 이전 응답의 allowlisted
+구조화 state만 받는다. 원문 대화 이력·이미지·파일명은 서버 state, DB, Run, Trace에
+저장하지 않는다. LIVE OpenAI 요청은 `store: false`, strict JSON Schema, 호출 1회,
+12초 timeout을 사용하고 실패하면 같은 요청을 결정론 질문 흐름으로 전환한다.
+모델 출력은 이전 턴과의 state transition을 다시 검사하며, 현재 발화에 명시적인
+수정 단서가 없으면 이미 확정된 연령·provider·runtime·origin·media·필수/제외 조건을
+완화할 수 없다. 아이 관람등급은 명시 답변과 일치해야 하며 마지막 턴의 미응답만
+결정론 fallback이 `ALL`로 fail-safe한다.
+
+브라우저는 JPG/PNG/WebP 원본 1장을 5MB까지 받은 뒤 최대 1600px JPEG로 재인코딩해
+EXIF를 제거하고, 서버에는 2MB 이하 파생 이미지만 보낸다. 서버는 Base64 크기와 실제
+파일 시그니처와 표시 해상도를 다시 검사한다. 이미지에서는 색감·분위기·배경·장르
+단서만 사용하며 사람의 신원이나 민감한 속성을 추론하지 않는다. 전체 대화 이력은
+탭 메모리에만 유지되고, 각 현재 발화와 선택 이미지만 요청 처리 중 일시 전송된다.
+새로고침과 새 탭에서는 대화 state가 초기화된다.
+파일 선택 외에 클립보드 붙여넣기와 패널 드래그앤드롭을 같은 전처리 경계로 받고,
+준비된 첨부는 composer에, 전송 성공 후 이미지는 사용자 대화 bubble에 object URL
+썸네일로 표시한다. 이 URL은 reset·추천 이동·unmount에서 즉시 revoke한다.
 
 ## Recommendation sequence
 
@@ -185,8 +223,10 @@ TMDB key는 ingestion에서만 필요하다. runtime 추천은 TMDB 응답이나
 
 ## HTTP, privacy, and errors
 
-공개 HTTP endpoint는 총 8개다. `MVP_API_ENDPOINTS`에는 추천·health/reset core
+공개 HTTP endpoint는 총 9개다. `MVP_API_ENDPOINTS`에는 추천·health/reset core
 6개가 있고, `/api/ads`와 `/api/ads/events`는 별도 advertising contract를 사용한다.
+`/api/curator/turn`도 별도 curator contract를 사용하며 Run/Trace persistence를
+호출하지 않는다.
 광고는 fictional static Demo fixture이고 현재 profile gate나 persistence가 없다.
 익명 Run 목록은 없다.
 공개 오류는 `BAD_REQUEST`, `NOT_FOUND`, `INTERNAL_ERROR`만 사용하고 stack,
