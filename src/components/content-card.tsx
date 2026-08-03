@@ -30,8 +30,6 @@ type ContentCardProps = {
   item: RecommendationItem;
   rank: number;
   hero?: boolean;
-  rail?: boolean;
-  conditionSummary?: string;
   onReplace?: (contentId: string) => void;
   replacing?: boolean;
   replacementPending?: boolean;
@@ -41,8 +39,6 @@ export function ContentCard({
   item,
   rank,
   hero = false,
-  rail = false,
-  conditionSummary,
   onReplace,
   replacing = false,
   replacementPending = false,
@@ -83,12 +79,18 @@ export function ContentCard({
             <p className="mb-3 text-sm font-black tracking-[0.14em] text-[#ff9f82]">
               오늘의 1순위 추천
             </p>
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {content.providers.slice(0, 3).map((availability) => (
+                <ProviderBadge
+                  provider={availability.provider}
+                  compact
+                  key={availability.provider}
+                />
+              ))}
+            </div>
             <h2 className="text-balance text-[clamp(2.5rem,8vw,6.5rem)] font-black leading-[0.96] tracking-[-0.065em] text-white">
               {content.title}
             </h2>
-            <p className="mt-3 text-base font-medium leading-7 text-slate-300">
-              {conditionSummary ?? "선택한 조건과 안전 기준을 모두 확인했어요."}
-            </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold leading-6 text-slate-200">
               <span>{content.releaseYear}</span>
@@ -132,13 +134,13 @@ export function ContentCard({
             <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
               {provider ? (
                 <a
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-6 text-sm font-black text-white shadow-[0_12px_32px_rgba(255,89,45,.25)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:w-auto"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-orange-300/35 bg-black/25 px-6 text-sm font-black text-orange-100 backdrop-blur-sm transition hover:border-orange-200/60 hover:bg-black/40 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:w-auto"
                   href={provider.watchUrl}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`${content.title} ${providerActionLabel(provider.linkType)}, 새 창`}
                 >
-                  {providerActionLabel(provider.linkType)}
+                  OTT에서 보기
                   <span aria-hidden="true">↗</span>
                 </a>
               ) : (
@@ -160,15 +162,6 @@ export function ContentCard({
               <WatchlistButton content={content} hero />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {content.providers.slice(0, 3).map((availability) => (
-                <ProviderBadge
-                  provider={availability.provider}
-                  compact
-                  key={availability.provider}
-                />
-              ))}
-            </div>
           </div>
         </div>
       </article>
@@ -177,11 +170,9 @@ export function ContentCard({
 
   return (
     <article
-      className={`group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#17202a] shadow-[0_16px_45px_rgba(0,0,0,.18)] transition duration-300 hover:-translate-y-1 hover:border-white/20 ${
-        rail
-          ? "w-[min(76vw,17rem)] shrink-0 snap-center md:w-auto"
-          : "min-w-0"
-      } ${replacing ? "opacity-60" : ""}`}
+      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#17202a] shadow-[0_16px_45px_rgba(0,0,0,.18)] transition duration-300 hover:-translate-y-1 hover:border-white/20 ${
+        replacing ? "opacity-60" : ""
+      }`}
       aria-busy={replacing}
     >
       <div className="relative aspect-[2/3] overflow-hidden bg-[#10151b] p-2.5">
@@ -198,7 +189,7 @@ export function ContentCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
         <div className="flex min-h-5 flex-wrap gap-1">
           {content.providers.slice(0, 2).map((availability) => (
             <ProviderBadge
@@ -208,15 +199,15 @@ export function ContentCard({
             />
           ))}
         </div>
-        <h3 className="mt-3 truncate text-lg font-black tracking-[-0.035em] text-white">
+        <h3 className="mt-4 line-clamp-2 text-lg font-black leading-6 tracking-[-0.035em] text-white">
           {content.title}
         </h3>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-300">
           {content.releaseYear} ·{" "}
           {mediaRuntimeLabel(content.mediaType, content.runtimeMinutes)} ·{" "}
           {ageLabel(content.ageRating)}
         </p>
-        <p className="mt-3 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-slate-300">
+        <p className="mt-4 text-sm leading-6 text-slate-300">
           {item.reasons[0]}
         </p>
 
@@ -233,7 +224,7 @@ export function ContentCard({
               className="inline-flex min-h-11 items-center text-sm font-black text-orange-200 transition hover:text-orange-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
               aria-label={`${content.title} ${providerActionLabel(provider.linkType)}, 새 창`}
             >
-              {providerActionLabel(provider.linkType)}
+              OTT에서 보기
               <span className="ml-1" aria-hidden="true">↗</span>
             </a>
           ) : (

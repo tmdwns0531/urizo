@@ -65,7 +65,7 @@ test("hero exposes separate active condition and prompt CTAs", async () => {
     hero,
     /data-cta="primary"[\s\S]*from-\[#ff5430\][\s\S]*to-\[#ff7c42\]/,
   );
-  assert.match(hero, /조건 골라 추천받기/);
+  assert.match(hero, /조건을 골라 추천받기/);
   assert.match(hero, /href="\/prompt"[\s\S]*data-cta="secondary"/);
   assert.match(hero, /data-cta="secondary"[\s\S]*bg-\[#17202a\]/);
   assert.match(hero, /문장으로 추천받기/);
@@ -83,6 +83,7 @@ test("landing keeps one three-card preview without a duplicate poster rail", asy
 
   assert.match(hero, /HERO_POSTERS\.map/);
   assert.match(showcase, /PREVIEW_POSTERS\.map/);
+  assert.doesNotMatch(showcase, /내 조건으로 추천 받기|href="\/choice"/);
   assert.doesNotMatch(
     showcase,
     /LANDING_POSTERS|slice\(1,\s*7\)|grid-cols-6|min-w-\[56rem\]|cinema-showcase__rail/,
@@ -105,6 +106,19 @@ test("landing keeps one three-card preview without a duplicate poster rail", asy
   assert.match(showcase, /overflow-x-auto/);
   assert.match(showcase, /snap-x/);
   assert.doesNotMatch(all, /placehold\.co|unsplash\.com/);
+});
+
+test("landing keeps only two consistently labeled Choice CTAs", async () => {
+  const [hero, showcase, footer] = await Promise.all([
+    read("src/components/landing/landing-hero.tsx"),
+    read("src/components/landing/recommendation-showcase.tsx"),
+    read("src/components/landing/landing-footer.tsx"),
+  ]);
+  const all = `${hero}\n${showcase}\n${footer}`;
+
+  assert.equal([...all.matchAll(/href="\/choice"/g)].length, 2);
+  assert.equal([...all.matchAll(/조건을 골라 추천받기/g)].length, 2);
+  assert.doesNotMatch(all, /조건 골라 추천받기|내 조건으로 추천 받기|추천 시작하기/);
 });
 
 test("landing copy matches the actual Choice flow and user perspective", async () => {

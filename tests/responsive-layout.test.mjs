@@ -34,24 +34,25 @@ test("public screens share AppShell and the same outer container", async () => {
 });
 
 test("desktop layouts do not retain mobile-width constraints", async () => {
-  const [css, choice, input, naturalResult, result] = await Promise.all([
+  const [css, choice, input, naturalResult, result, completed] = await Promise.all([
     read("src/app/globals.css"),
     read("src/components/choice-stepper/choice-stepper.tsx"),
     read("src/components/natural-recommendation/natural-input-step.tsx"),
     read("src/components/natural-recommendation/natural-result.tsx"),
     read("src/components/recommendation-view.tsx"),
+    read("src/components/completed-recommendation-result.tsx"),
   ]);
   const activeUiCss = css.slice(css.indexOf("/* Choice stepper"));
 
   assert.doesNotMatch(activeUiCss, /760px|1120px|1200px|max-width:\s*900px/);
   assert.match(choice, /app-container choice-stepper-main/);
   assert.match(input, /app-container flex flex-1/);
-  for (const source of [naturalResult, result]) {
-    assert.match(
-      source,
-      /md:grid md:grid-cols-2[\s\S]*?lg:grid-cols-3[\s\S]*?xl:grid-cols-5/,
-    );
-  }
+  assert.match(naturalResult, /source="natural"/);
+  assert.match(result, /source="choice"/);
+  assert.match(
+    completed,
+    /grid-cols-1[\s\S]*?sm:grid-cols-2[\s\S]*?lg:grid-cols-3[\s\S]*?xl:grid-cols-5/,
+  );
 });
 
 test("CSS layout switches align to the shared responsive breakpoints", async () => {

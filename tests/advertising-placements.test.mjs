@@ -83,6 +83,27 @@ test("sponsored creative keeps only impression and click measurements", async ()
   assert.doesNotMatch(contract, /"VIDEO_START"|"VIDEO_COMPLETE"/);
 });
 
+test("sponsored cards lead through the internal demo partner promotion", async () => {
+  const [selector, page, partner] = await Promise.all([
+    read("src/domains/advertising/campaign-selector.ts"),
+    read("src/app/sponsor/demo/page.tsx"),
+    read("public/partner-demo.html"),
+  ]);
+
+  assert.match(selector, /detailUrl: "\/sponsor\/demo"/);
+  assert.match(selector, /detailUrl: "\/sponsor\/demo\?campaign=orbiel"/);
+  assert.match(page, /파트너 프로모션/);
+  assert.doesNotMatch(page, /실제 제휴나 결제가 없는/);
+  assert.match(page, /\/partner-demo\.html\?campaign=/);
+  assert.match(page, /파트너 사이트에서 보기 ↗/);
+  assert.match(page, /rel="noreferrer sponsored"/);
+  assert.doesNotMatch(page, /데모 광고/);
+  assert.match(page, /lumia-glass-forest-poster\.webp/);
+  assert.match(page, /absolute inset-x-0 bottom-0/);
+  assert.match(partner, /VIA PLAY/);
+  assert.doesNotMatch(partner, /가상 파트너 서비스/);
+});
+
 test("ad selection request, anonymous context, and event API boundaries stay intact", async () => {
   const [ad, contract, route, eventsRoute, selector] = await Promise.all([
     read("src/components/advertising/sponsored-video-ad.tsx"),
@@ -266,32 +287,21 @@ test("sponsored card CSS removes controls and follows the organic rail shape", a
 });
 
 test("organic TOP 1, alternatives, and sponsored creative stay in that order", async () => {
-  const [choiceResult, naturalResult] = await Promise.all([
-    read("src/components/recommendation-view.tsx"),
-    read("src/components/natural-recommendation/natural-result.tsx"),
-  ]);
-  const completed = choiceResult.slice(
-    choiceResult.indexOf("export function CompletedView"),
-    choiceResult.indexOf("export function RecommendationView"),
+  const source = await read(
+    "src/components/completed-recommendation-result.tsx",
   );
-  const naturalCompleted = naturalResult.slice(
-    naturalResult.indexOf("function CompletedNaturalResults"),
-    naturalResult.indexOf("function ResultActions"),
-  );
+  const topPick = source.indexOf("response.topPick");
+  const alternatives = source.indexOf("alternatives.map", topPick);
+  const sponsored = source.indexOf('placement="RESULT"', alternatives);
 
-  for (const source of [completed, naturalCompleted]) {
-    const topPick = source.indexOf("response.topPick");
-    const alternatives = source.indexOf("alternatives.map", topPick);
-    const sponsored = source.indexOf('placement="RESULT"', alternatives);
-    assert.ok(topPick >= 0, "TOP 1 must render");
-    assert.ok(alternatives > topPick, "alternatives must follow TOP 1");
-    assert.ok(sponsored > alternatives, "sponsored creative must end the rail");
-    assert.match(source.slice(alternatives, sponsored), /rail/);
-    assert.match(source.slice(sponsored), /variant="rail"/);
-    assert.match(source, /md:grid-cols-2/);
-    assert.match(source, /lg:grid-cols-3/);
-    assert.match(source, /xl:grid-cols-5/);
-  }
+  assert.ok(topPick >= 0, "TOP 1 must render");
+  assert.ok(alternatives > topPick, "alternatives must follow TOP 1");
+  assert.ok(sponsored > alternatives, "sponsored creative must end the grid");
+  assert.match(source.slice(sponsored), /variant="rail"/);
+  assert.match(source, /grid-cols-1/);
+  assert.match(source, /sm:grid-cols-2/);
+  assert.match(source, /lg:grid-cols-3/);
+  assert.match(source, /xl:grid-cols-5/);
 });
 
 test("waiting creative uses the real request window without delaying results", async () => {
