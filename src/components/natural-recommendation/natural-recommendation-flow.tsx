@@ -411,6 +411,7 @@ export function NaturalRecommendationFlow() {
         <NaturalRecommendationNav
           dirty={Boolean(state.input.trim())}
           onReset={confirmAndReset}
+          onResult={state.step === "result"}
         />
       }
       contentAsMain={false}
