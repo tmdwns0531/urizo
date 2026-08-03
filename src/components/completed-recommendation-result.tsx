@@ -7,6 +7,11 @@ import type {
 } from "@/contracts/mvp-recommendation";
 import { SponsoredVideoAd } from "./advertising/sponsored-video-ad";
 import { ContentCard } from "./content-card";
+import {
+  ComparisonCandidate,
+  RecommendationComparisonTray,
+  useRecommendationComparisonSelection,
+} from "./content-comparison/recommendation-comparison-tray";
 import { RecommendationTimeline } from "./recommendation-timeline";
 
 export type ResultSource = "choice" | "natural";
@@ -262,6 +267,12 @@ export function CompletedRecommendationResult({
   const alternatives = response.recommendations
     .filter((item) => item.content.id !== response.topPick?.content.id)
     .slice(0, 4);
+  const comparisonCandidates = response.topPick
+    ? [response.topPick.content, ...alternatives.map(({ content }) => content)]
+    : [];
+  const { selectedIds, toggle } =
+    useRecommendationComparisonSelection(comparisonCandidates);
+  const selectionFull = selectedIds.length >= 2;
 
   function showFeedback(feedback: ReplacementFeedback) {
     setReplacementFeedback(feedback);
@@ -364,14 +375,24 @@ export function CompletedRecommendationResult({
           <h2 id="top-pick-heading" className="sr-only">
             오늘의 1순위 추천
           </h2>
-          <ContentCard
-            item={response.topPick}
-            rank={1}
-            hero
-            onReplace={replace}
-            replacing={replacingId === response.topPick.content.id}
-            replacementPending={replacingId !== null}
-          />
+          <ComparisonCandidate
+            content={response.topPick.content}
+            selected={selectedIds.includes(response.topPick.content.id)}
+            disabled={
+              selectionFull &&
+              !selectedIds.includes(response.topPick.content.id)
+            }
+            onToggle={toggle}
+          >
+            <ContentCard
+              item={response.topPick}
+              rank={1}
+              hero
+              onReplace={replace}
+              replacing={replacingId === response.topPick.content.id}
+              replacementPending={replacingId !== null}
+            />
+          </ComparisonCandidate>
         </section>
       ) : (
         <section className="rounded-3xl border border-dashed border-slate-700 bg-white/[0.03] px-6 py-16 text-center">
@@ -438,14 +459,24 @@ export function CompletedRecommendationResult({
           </div>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {alternatives.map((item, index) => (
-              <ContentCard
-                item={item}
-                rank={index + 2}
+              <ComparisonCandidate
+                content={item.content}
+                selected={selectedIds.includes(item.content.id)}
+                disabled={
+                  selectionFull && !selectedIds.includes(item.content.id)
+                }
+                onToggle={toggle}
                 key={item.content.id}
-                onReplace={replace}
-                replacing={replacingId === item.content.id}
-                replacementPending={replacingId !== null}
-              />
+              >
+                <ContentCard
+                  item={item}
+                  rank={index + 2}
+                  key={item.content.id}
+                  onReplace={replace}
+                  replacing={replacingId === item.content.id}
+                  replacementPending={replacingId !== null}
+                />
+              </ComparisonCandidate>
             ))}
             <SponsoredVideoAd
               placement="RESULT"
@@ -456,6 +487,12 @@ export function CompletedRecommendationResult({
           </div>
         </section>
       ) : null}
+
+      <RecommendationComparisonTray
+        contents={comparisonCandidates}
+        selectedIds={selectedIds}
+        onToggle={toggle}
+      />
 
       <div className="mt-8">
         <RecommendationTimeline response={response} />

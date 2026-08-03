@@ -1,0 +1,556 @@
+.page {
+  min-height: 100%;
+  padding-bottom: 6rem;
+  background:
+    radial-gradient(circle at 10% 8%, rgba(83, 169, 255, 0.12), transparent 28rem),
+    radial-gradient(circle at 90% 18%, rgba(255, 112, 67, 0.12), transparent 30rem),
+    #0f1215;
+}
+
+.hero {
+  padding-top: clamp(3.5rem, 9vw, 7.5rem);
+  padding-bottom: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.eyebrow,
+.sectionHeading p {
+  color: #ff9777;
+  font-size: 0.875rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.hero h1 {
+  max-width: 58rem;
+  margin-top: 0.85rem;
+  color: #fff;
+  font-size: clamp(2.5rem, 7vw, 5.8rem);
+  font-weight: 950;
+  letter-spacing: -0.06em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.heroDescription {
+  max-width: 46rem;
+  margin-top: 1.5rem;
+  color: #b9c4cf;
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  line-height: 1.8;
+}
+
+.selectorSection,
+.resultSection,
+.notice,
+.emptyState {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.75rem;
+  background: rgba(20, 27, 34, 0.92);
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.18);
+}
+
+.selectorSection {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionHeading h2 {
+  margin-top: 0.35rem;
+  color: #f8fafc;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.sectionHeading > span {
+  color: #8fa0b0;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.swapButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.65rem 1rem;
+  color: #dce5ec;
+  font-size: 0.875rem;
+  font-weight: 850;
+  transition: 160ms ease;
+}
+
+.swapButton:hover:not(:disabled) {
+  border-color: rgba(255, 151, 119, 0.55);
+  color: #ffb29b;
+  transform: translateY(-1px);
+}
+
+.swapButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.selectorGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.selectorActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.submitButton {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: #ff6b3d;
+  padding: 0.7rem 1.2rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.submitButton:hover {
+  background: #ff7d56;
+  transform: translateY(-1px);
+}
+.selectField {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.selectField > span {
+  color: #9aa9b7;
+  font-size: 0.875rem;
+  font-weight: 850;
+}
+
+.selectField select {
+  min-width: 0;
+  min-height: 3.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.9rem;
+  background: #111820;
+  padding: 0 2.75rem 0 1rem;
+  color: #f8fafc;
+  font-size: 0.96rem;
+  font-weight: 750;
+}
+
+.selectField select:focus-visible,
+.swapButton:focus-visible,
+.submitButton:focus-visible {
+  outline: 2px solid #ff7043;
+  outline-offset: 3px;
+}
+
+.vsMark,
+.centerVs {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 112, 67, 0.38);
+  border-radius: 999px;
+  background: rgba(255, 112, 67, 0.12);
+  color: #ff9e80;
+  font-size: 0.875rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.vsMark {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.results {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.comparisonCards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.contentCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.44fr) minmax(0, 0.56fr);
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.6rem;
+  background: linear-gradient(145deg, rgba(28, 38, 48, 0.98), rgba(18, 24, 31, 0.98));
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.2);
+}
+
+.cardLabel {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  left: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(7, 11, 16, 0.78);
+  padding: 0.4rem 0.7rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 900;
+  backdrop-filter: blur(10px);
+}
+
+.posterFrame {
+  overflow: hidden;
+  min-width: 0;
+  padding: 0.85rem;
+}
+
+.posterFrame > div {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 22rem;
+}
+
+.contentBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+  padding: 1.5rem 1.5rem 1.5rem 0.5rem;
+}
+
+.contentBody h2 {
+  margin-top: 0.35rem;
+  color: #fff;
+  font-size: clamp(1.45rem, 3vw, 2.3rem);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.contentMeta,
+.rating {
+  color: #aab8c5;
+  font-size: 0.875rem;
+  font-weight: 750;
+  line-height: 1.6;
+}
+
+.providerList,
+.chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.synopsis {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #cbd5df;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.chipList span {
+  border-radius: 999px;
+  background: rgba(83, 169, 255, 0.1);
+  padding: 0.35rem 0.65rem;
+  color: #a8d1ff;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.rating {
+  color: #ffd780;
+}
+
+.centerVs {
+  width: 4rem;
+  height: 4rem;
+  font-size: 1rem;
+}
+
+.resultSection {
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.commonGrid,
+.recommendationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.5rem;
+}
+
+.commonCard {
+  display: flex;
+  min-width: 0;
+  gap: 0.8rem;
+  border: 1px solid rgba(37, 200, 167, 0.2);
+  border-radius: 1rem;
+  background: rgba(37, 200, 167, 0.07);
+  padding: 1rem;
+}
+
+.commonCard > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(37, 200, 167, 0.17);
+  color: #6ee7cb;
+  font-size: 0.875rem;
+  font-weight: 950;
+}
+
+.commonCard h3,
+.recommendationCard h3 {
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.commonCard p {
+  margin-top: 0.35rem;
+  color: #aebcc8;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.differenceTable {
+  overflow: hidden;
+  margin-top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+}
+
+.tableHeader,
+.differenceRow {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) repeat(2, minmax(0, 1fr));
+}
+
+.tableHeader {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.tableHeader span {
+  padding: 0.85rem 1rem;
+  color: #94a4b2;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.differenceRow + .differenceRow {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.differenceRow > div {
+  min-width: 0;
+  padding: 1rem;
+  color: #e5edf3;
+  font-size: 0.88rem;
+  font-weight: 760;
+  line-height: 1.6;
+}
+
+.differenceRow > div + div,
+.tableHeader span + span {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.differenceLabel strong {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.differenceLabel p {
+  margin-top: 0.3rem;
+  color: #8999a7;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.recommendationCard {
+  min-width: 0;
+  border: 1px solid rgba(255, 112, 67, 0.2);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, rgba(255, 112, 67, 0.1), rgba(255, 255, 255, 0.025));
+  padding: 1.15rem;
+}
+
+.recommendationCard > p {
+  color: #ff9e80;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.recommendationCard h3 {
+  margin-top: 0.45rem;
+  font-size: 1.15rem;
+}
+
+.recommendationCard > span {
+  display: block;
+  margin-top: 0.6rem;
+  color: #aebcc8;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.tieCard {
+  border-color: rgba(83, 169, 255, 0.2);
+  background: linear-gradient(145deg, rgba(83, 169, 255, 0.09), rgba(255, 255, 255, 0.025));
+}
+
+.tieCard > p {
+  color: #8bc3ff;
+}
+
+.notice,
+.emptyState {
+  padding: 1.25rem 1.5rem;
+}
+
+.notice {
+  border-color: rgba(255, 215, 128, 0.2);
+  background: rgba(255, 215, 128, 0.05);
+}
+
+.notice strong,
+.emptyState h2 {
+  color: #ffe6ad;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.notice p,
+.emptyState p {
+  margin-top: 0.4rem;
+  color: #aeb9c3;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.emptyState {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 1023px) {
+  .comparisonCards {
+    grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .contentCard {
+    grid-template-columns: 1fr;
+  }
+
+  .contentBody {
+    padding: 0.5rem 1.25rem 1.4rem;
+  }
+
+  .posterFrame > div {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .selectorGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .vsMark {
+    margin: 0 auto;
+  }
+
+  .comparisonCards {
+    grid-template-columns: 1fr;
+  }
+
+  .centerVs {
+    width: 3rem;
+    height: 3rem;
+    margin: -0.4rem auto;
+  }
+
+  .commonGrid,
+  .recommendationGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .differenceRow {
+    grid-template-columns: 1fr;
+    padding: 0.25rem 0;
+  }
+
+  .differenceRow > div + div {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 0;
+  }
+
+  .differenceRow > div[data-label]::before {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #8293a2;
+    content: attr(data-label);
+    font-size: 0.875rem;
+    font-weight: 900;
+  }
+}
+
+@media (max-width: 639px) {
+  .page {
+    padding-bottom: 3.5rem;
+  }
+
+  .hero {
+    padding-top: 3.5rem;
+  }
+
+  .sectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .swapButton,
+  .submitButton {
+    width: 100%;
+  }
+
+  .contentCard {
+    border-radius: 1.25rem;
+  }
+}
