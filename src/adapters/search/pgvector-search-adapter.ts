@@ -61,16 +61,19 @@ LIMIT $5
 `.trim();
 
 function sanitizedInitialInput(
-  invocation: Extract<RecommendationSearchInvocation, { kind: "initial" }>,
+  input: RecommendationSearchInvocation["input"],
 ): SanitizedRecommendationSearchInput {
-  const input = invocation.input;
   return {
     selectedProviders: [...input.selectedProviders],
     companions: [...input.companions],
     moods: [...input.moods],
     desiredGenres: [...input.desiredGenres],
     companionAvoidGenres: [...input.companionAvoidGenres],
+    requiredGenres: [...(input.requiredGenres ?? [])],
+    excludedGenres: [...(input.excludedGenres ?? [])],
+    mediaType: input.mediaType ?? "ANY",
     maxRuntimeMinutes: input.maxRuntimeMinutes,
+    childAgeRatingLimit: input.childAgeRatingLimit ?? null,
     originPreference: input.originPreference,
     hasNaturalLanguage: input.hasNaturalLanguage,
   };
@@ -126,7 +129,7 @@ export class PgVectorSearchAdapter implements RecommendationSearchAdapter {
     let tokenUsage = 0;
 
     if (invocation.kind === "initial") {
-      input = sanitizedInitialInput(invocation);
+      input = sanitizedInitialInput(invocation.input);
       const embedded = await this.embeddings.embed(
         buildMvpSearchQuery(invocation.input),
         signal,
@@ -141,7 +144,7 @@ export class PgVectorSearchAdapter implements RecommendationSearchAdapter {
       });
       inputFingerprint = await createInputFingerprint(input, queryVector);
     } else {
-      input = invocation.input;
+      input = sanitizedInitialInput(invocation.input);
       queryVector = await verifyRecommendationSearchContinuation(
         input,
         invocation.continuation,

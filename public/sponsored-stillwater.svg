@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img" aria-labelledby="title description">
+  <title id="title">고요한 호수의 밤</title>
+  <desc id="description">달빛이 비치는 잔잔한 호수와 겹쳐진 산의 추상 풍경</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17234a"/>
+      <stop offset="0.58" stop-color="#31556b"/>
+      <stop offset="1" stop-color="#10252d"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f8290"/>
+      <stop offset="1" stop-color="#10252d"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#fff3ca" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#fff3ca" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#sky)"/>
+  <circle cx="430" cy="210" r="130" fill="url(#glow)"/>
+  <circle cx="430" cy="210" r="58" fill="#fff2c9"/>
+  <path d="M0 510 132 365l95 94 94-139 155 190 124-105v231H0Z" fill="#172f3d"/>
+  <path d="M0 550 150 430l108 91 97-126 145 137 100-73v190H0Z" fill="#234a57"/>
+  <path d="M0 590c110-24 201-13 286 4 102 21 196 20 314-10v316H0Z" fill="url(#water)"/>
+  <path d="M356 585c53 6 105 6 157-2-32 32-63 79-93 151-25-67-46-115-64-149Z" fill="#fff1bd" opacity="0.2"/>
+  <g fill="none" stroke="#d6eef0" stroke-linecap="round" opacity="0.22">
+    <path d="M83 679h191"/>
+    <path d="M315 724h184"/>
+    <path d="M123 780h318"/>
+  </g>
+</svg>

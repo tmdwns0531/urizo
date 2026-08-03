@@ -2,6 +2,12 @@
 
 ## Authority and current status
 
+- Current v0.9 runtime source: active code under `src/contracts`,
+  `src/domains`, and `src/composition`, plus `prisma/schema.prisma` and the
+  ordered migrations. Code takes precedence over historical documents when
+  reporting as-is behavior.
+- Current implementation summary and review baseline:
+  `docs/ARCHITECTURE.md` and `docs/V09-DEV-REVIEW-READINESS.md`
 - LIVE extension and acceptance source:
   `docs/OTT-DAMOA-LIVE-MVP-v0.8.md`
 - Demo product scope and acceptance source: `docs/OTT-DAMOA-MVP-v0.6.md`
@@ -10,11 +16,13 @@
 - Persistence source: `docs/ERD-v0.8-live.md`,
   `docs/ERD-v0.7-baseline.md`,
   `prisma/schema.prisma`, and `prisma/migrations/**`
-- `docs/ARCHITECTURE.md` and `docs/TEAM-OWNERSHIP.md` summarize those sources
-  and have lower priority.
+- `docs/TEAM-OWNERSHIP.md` summarizes the active review boundaries. The v0.6,
+  v0.7, and v0.8 documents remain historical acceptance baselines except where
+  an explicit v0.9 addendum or active code supersedes them.
 
-The v0.7 anonymous contracts are the active runtime boundary. The Demo and LIVE
-profiles both use the anonymous CHOICE, RecommendationRun, and AgentTrace flow.
+The v0.9 anonymous contracts are the active runtime boundary. The Demo and LIVE
+profiles both use anonymous CHOICE/natural-language input, bounded Agent,
+RecommendationRun, and AgentTrace flow.
 Deprecated authentication/profile/engagement types may remain only as compile
 compatibility while shared-contract cleanup is coordinated. Do not add login,
 profile, MY, saved, watched, or backend not-interested behavior.
@@ -23,6 +31,13 @@ The v0.8 LIVE extension adds Prisma catalog storage, offline TMDB ingestion,
 OpenAI embeddings with pgvector search, and an OpenAI selector. It does not
 reintroduce identity or engagement. Keep the v0.6 credential-free Demo as a
 first-class preset.
+
+The v0.9 extension adds deterministic natural-language interpretation, at most
+one pre-search family clarification, the server-only `searchCatalog` tool,
+media/required/excluded-genre policy, and static sponsored Demo fixtures. The
+two advertising routes are separate from the fixed six core API descriptors,
+have no persistence, and currently have no `APP_PROFILE` gate or assigned
+vertical owner. Do not describe them as a commercial ad system or as LIVE-gated.
 
 ## Start here
 
@@ -50,12 +65,15 @@ Before handing work off, run:
 `db:validate` uses a local validation-only URL inside the Prisma CLI child
 process and does not connect to a database. Selecting a Prisma runtime adapter requires actual `DATABASE_URL`; migration commands require both `DATABASE_URL` and `DIRECT_URL`.
 
-The integration suite covers the anonymous Demo regression flow and v0.8 LIVE
-adapter contracts while retaining the accepted v0.7 contract gates.
+The integration suite covers the anonymous v0.9 Demo regression flow and v0.8
+LIVE adapter contracts while retaining the accepted v0.7 contract gates.
 
 ## Architecture invariants
 
 - Dependency direction: `app -> domains -> contracts`.
+- `docs/ARCHITECTURE.md` lists existing domain→adapter and adapter→domain
+  exceptions. Do not extend them; treat cleanup as a separate shared-boundary
+  change.
 - Concrete integrations are injected only from `src/composition`.
 - The v0.6 target default is fixture catalog, local search, deterministic
   selection, and memory Run/Trace stores.
@@ -68,8 +86,15 @@ adapter contracts while retaining the accepted v0.7 contract gates.
 - Never weaken age, provider, runtime, origin, exclusion, replacement, or final
   safety filters to make a test pass.
 - The active Prisma schema contains `RecommendationRun`, `AgentTrace`, and
-  only the catalog/provider/search-document/embedding models authorized by the
-  v0.8 LIVE ERD.
+  the four catalog/provider/search-document/embedding models authorized by the
+  v0.8 LIVE extension: six active models in total.
+- Structured CHOICE adult family maps to exact `FAMILY`; only unresolved
+  natural family composition is clarified. `WITH_CHILDREN` requires an
+  `ALL|7|12|15` maximum rating or fails closed. `18` and `UNKNOWN` never pass.
+- Existing migrations are immutable. The additive v0.9 atomic-hardening
+  migration re-establishes the lifecycle CHECK but does not retroactively make
+  the earlier multiturn migration atomic; read
+  `docs/V09-MIGRATION-ATOMICITY-REVIEW.md` before deployment.
 - Never persist user identity, natural-language source text, raw tokens,
   matched terms, prompts, secrets, or backend engagement state in Run/Trace.
 - TMDB is an ingestion pipeline, never a recommendation-request dependency.
@@ -81,17 +106,21 @@ boundary.
 ## Active ownership
 
 The v0.7 five-person vertical ownership remains the team baseline. The v0.8
-LIVE module boundaries are additive:
+LIVE and v0.9 bounded-Agent module boundaries are additive:
 
 - 1: LIVE preset, conditional environment validation, composition, health,
   integration, release
 - 2: Prisma catalog schema/repository, TMDB ingestion, migrations
-- 3: OpenAI embedding, pgvector search, vector continuation
-- 4: OpenAI selector, model budget, deterministic fallback
-- 5: final policy, Prisma Trace, approval/replacement continuation
+- 3: CHOICE/natural parser and request, OpenAI embedding, pgvector search,
+  vector continuation
+- 4: bounded Agent executor mechanics, ranking, OpenAI selector, model budget,
+  deterministic fallback, completed result
+- 5: Agent conversation/orchestration, final policy, Prisma Trace,
+  family/runtime approval, replacement, canonical interaction
+- ⚠️ unassigned: v0.9 Demo advertising contract/domain/routes/components/assets
 
-The detailed v0.8 team allocation document may refine workload and branch
-names, but it must preserve these single-writer boundaries.
+A future team allocation document may refine workload and branch names, but it
+must preserve these single-writer boundaries.
 
 The active v0.7 responsibilities remain:
 
@@ -102,8 +131,8 @@ The active v0.7 responsibilities remain:
 - 5: Policy, approval, replacement, Trace, result interaction
 
 These roles replace the historical A–E login/engagement ownership model for
-new work. Exact files, review gates, branch examples, merge order, and E2E
-responsibility are in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
+new work. Active concise review gates are in `docs/TEAM-OWNERSHIP.md`; historical
+allocation details remain in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
 
 ## Git workflow
 
@@ -113,6 +142,19 @@ responsibility are in `docs/BACKEND-SPRINT-OWNERSHIP-v0.7.md`.
   direction.
 - Every contributor, including the repository owner, branches from the latest
   accepted `dev`; personal work never starts directly on `dev` or `main`.
+- Before implementation, fetch and inspect `origin/dev`, then inspect every
+  open pull request targeting `dev`, including its changed-file list rather
+  than only its title or summary.
+- Compare the planned file and domain scope with both remote `dev` and open
+  pull requests. If they overlap, coordinate sequencing with the PR author and
+  single writer, reduce the scope, wait for the earlier PR, or create a small
+  owner-led prerequisite contract/schema PR before implementation.
+- Repeat the remote `dev` and open-PR overlap check before requesting review
+  and again before merge. Record the checked `origin/dev` commit, relevant PRs,
+  overlapping files, and coordination result in the pull request description.
+- If remote or GitHub access prevents this check, report the limitation and do
+  not claim the branch is conflict-free or expand beyond explicitly assigned
+  single-writer files.
 - Feature branch names must use
   `feature/<github-id>_<work-slug>_<version>`.
 - `<github-id>` is the contributor's exact GitHub login. `<work-slug>` uses

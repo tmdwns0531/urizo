@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img" aria-labelledby="title description">
+  <title id="title">저녁 정원의 빛</title>
+  <desc id="description">노을빛 정원과 작은 산책로를 담은 차분한 추상 풍경</desc>
+  <defs>
+    <linearGradient id="evening" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#342c57"/>
+      <stop offset="0.52" stop-color="#9a5d68"/>
+      <stop offset="1" stop-color="#273f3c"/>
+    </linearGradient>
+    <radialGradient id="sunset">
+      <stop offset="0" stop-color="#ffd99d" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#ffd99d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="path" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1cab0" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#bc8d7d" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#evening)"/>
+  <circle cx="175" cy="300" r="170" fill="url(#sunset)"/>
+  <circle cx="175" cy="300" r="48" fill="#ffdca4" opacity="0.9"/>
+  <path d="M0 520c92-55 166-73 246-48 88 27 163 13 354-77v505H0Z" fill="#29443d"/>
+  <path d="M0 625c104-73 198-81 281-40 91 45 172 27 319-35v350H0Z" fill="#18362f"/>
+  <path d="M334 900c-13-138-17-241 48-335 39-56 66-89 86-126-40 46-93 86-139 126-96 83-113 199-128 335Z" fill="url(#path)"/>
+  <g fill="#bf8978" opacity="0.75">
+    <circle cx="75" cy="542" r="18"/>
+    <circle cx="113" cy="568" r="13"/>
+    <circle cx="505" cy="521" r="16"/>
+    <circle cx="548" cy="548" r="11"/>
+  </g>
+  <g fill="#e1b39c" opacity="0.55">
+    <circle cx="91" cy="531" r="6"/>
+    <circle cx="127" cy="576" r="5"/>
+    <circle cx="493" cy="511" r="5"/>
+    <circle cx="561" cy="541" r="5"/>
+  </g>
+</svg>

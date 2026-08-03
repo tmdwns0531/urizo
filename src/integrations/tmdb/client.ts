@@ -2,6 +2,7 @@ import type {
   TmdbCatalogSource,
   TmdbDetail,
   TmdbDiscoverPage,
+  TmdbDiscoverSweep,
   TmdbMediaKind,
   TmdbMovieDetail,
   TmdbTvDetail,
@@ -106,19 +107,46 @@ export function createTmdbClient(
   async function listPage(
     mediaKind: TmdbMediaKind,
     page: number,
+    sweep?: TmdbDiscoverSweep,
   ): Promise<TmdbDiscoverPage> {
     if (!Number.isInteger(page) || page < 1 || page > 500) {
       throw new TmdbClientError("INVALID_CONFIGURATION");
     }
+    const parameters: Record<string, string> = {
+      page: String(page),
+      language,
+      region,
+      sort_by: sweep?.sortBy ?? "popularity.desc",
+      include_adult: "false",
+    };
+    if (sweep?.genreIds?.length) {
+      // TMDB 는 쉼표가 AND, 파이프가 OR 다. sweep 의 장르 목록은 "이 중
+      // 하나라도" 를 뜻하므로 파이프로 잇는다. 쉼표를 쓰면 모든 장르를 동시에
+      // 가진 작품만 걸려서 후보가 급감한다 (실측: 53,9648,80 은 185편,
+      // 53|9648|80 은 4,073편).
+      parameters.with_genres = sweep.genreIds.join("|");
+    }
+    if (sweep?.minVoteCount !== undefined) {
+      parameters["vote_count.gte"] = String(sweep.minVoteCount);
+    }
+    if (sweep?.watchProviders?.length) {
+      // with_watch_providers 는 watch_region 이 함께 있어야 동작한다.
+      // 여기서도 파이프가 OR 다 ("이 중 한 곳에서라도 볼 수 있는").
+      parameters.with_watch_providers = sweep.watchProviders.join("|");
+      parameters.watch_region = region;
+    }
+    if (sweep?.maxCertification && mediaKind === "movie") {
+      // certification 계열은 movie discover 에만 있다. tv 에 보내면 무시되거나
+      // 오류가 나므로 미디어 종류를 확인하고 건다.
+      parameters.certification_country = region;
+      parameters["certification.lte"] = sweep.maxCertification;
+    }
+    if (sweep?.maxRuntimeMinutes !== undefined) {
+      parameters["with_runtime.lte"] = String(sweep.maxRuntimeMinutes);
+    }
     const body = await request<TmdbDiscoverPage>(
       `/discover/${mediaKind}`,
-      {
-        page: String(page),
-        language,
-        region,
-        sort_by: "popularity.desc",
-        include_adult: "false",
-      },
+      parameters,
     );
     if (!Array.isArray(body.results)) {
       throw new TmdbClientError("INVALID_RESPONSE");
@@ -133,10 +161,12 @@ export function createTmdbClient(
     if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
       throw new TmdbClientError("INVALID_CONFIGURATION");
     }
+    // keywords 는 mood·companion 태깅의 유일한 근거다. 별도 호출을 늘리지
+    // 않도록 기존 상세 요청에 함께 실어 받는다.
     const appendToResponse =
       mediaKind === "movie"
-        ? "release_dates,watch/providers"
-        : "content_ratings,watch/providers";
+        ? "release_dates,watch/providers,keywords"
+        : "content_ratings,watch/providers,keywords";
     return request<TmdbDetail>(
       `/${mediaKind}/${tmdbId}`,
       {

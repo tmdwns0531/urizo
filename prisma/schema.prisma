@@ -163,6 +163,7 @@ model CatalogContent {
 
   providers       ProviderAvailability[]
   searchDocuments ContentSearchDocument[]
+  watchlistItems  WatchlistItem[]
 
   @@unique([tmdbId, mediaType], map: "catalog_contents_tmdb_media_key")
   @@index([isActive, mediaType], map: "catalog_contents_active_media_idx")
@@ -216,4 +217,35 @@ model ContentEmbedding {
   @@unique([searchDocumentId, model], map: "content_embeddings_document_model_key")
   @@index([searchDocumentId], map: "content_embeddings_document_idx")
   @@map("content_embeddings")
+}
+
+// v0.9 accounts. Login exists only so a watchlist can belong to someone; the
+// anonymous recommendation path never reads these tables and eligibility stays
+// independent of any account (see domains/catalog/filtering.ts).
+
+model Account {
+  id           String   @id @db.VarChar(64)
+  nickname     String   @unique(map: "accounts_nickname_key") @db.VarChar(12)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  birthDate    DateTime @map("birth_date") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  watchlistItems WatchlistItem[]
+
+  @@map("accounts")
+}
+
+model WatchlistItem {
+  id        String   @id @db.VarChar(64)
+  accountId String   @map("account_id") @db.VarChar(64)
+  contentId String   @map("content_id") @db.VarChar(64)
+  savedAt   DateTime @default(now()) @map("saved_at") @db.Timestamptz(3)
+
+  account Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  content CatalogContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, contentId], map: "watchlist_items_account_content_key")
+  @@index([accountId, savedAt], map: "watchlist_items_account_saved_idx")
+  @@map("watchlist_items")
 }

@@ -7,6 +7,12 @@
 - 방식: 백엔드 도메인 오너십 + 담당 화면 프론트엔드 연동 + 담당 E2E
 - 통합 오너: 담당 1
 
+> **v0.9 supersession note (2026-08-03):** 이 문서의 two-model schema,
+> CHOICE-only 입력, 30→45 runtime 승인, 파일/branch 할당은 역사적 스프린트
+> 기준선이다. 현재 자연어/bounded Agent, family pre-search clarification,
+> six-model LIVE schema, 광고 surface의 review 경계는
+> `docs/TEAM-OWNERSHIP.md`를 따른다. 광고는 아직 오너 미지정이다.
+
 이 문서는 제품 기획을 v0.7로 변경하는 문서가 아니다. 제품의 MVP 기능 범위와
 완료 조건은 계속 `OTT-DAMOA-MVP-v0.6.md`를 따른다. v0.7은 기존 백엔드 전용
 역할 분담을 실제 사용자 흐름 단위의 수직 역할 분담으로 보완한 실행 문서다.

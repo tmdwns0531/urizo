@@ -13,6 +13,11 @@ import type {
   TmdbTvDetail,
   TmdbWatchProvider,
 } from "./types";
+import {
+  deriveCompanionTags,
+  deriveMoodTags,
+  normalizeKeywords,
+} from "./tagging";
 
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
@@ -351,6 +356,14 @@ export function normalizeTmdbDetail(
       ? (detail as TmdbMovieDetail).belongs_to_collection
       : null;
 
+  const genres = uniqueStrings((detail.genres ?? []).map((genre) => genre.name));
+  const keywords = normalizeKeywords(
+    (detail.keywords?.keywords ?? detail.keywords?.results ?? []).map(
+      (keyword) => keyword?.name ?? "",
+    ),
+  );
+  const ageRating = tmdbAgeRating(mediaKind, detail);
+
   return {
     ok: true,
     content: {
@@ -361,12 +374,10 @@ export function normalizeTmdbDetail(
       mediaType: mediaTypeFor(mediaKind),
       runtimeMinutes,
       releaseYear,
-      genres: uniqueStrings(
-        (detail.genres ?? []).map((genre) => genre.name),
-      ),
-      moodTags: [],
-      companionTags: [],
-      ageRating: tmdbAgeRating(mediaKind, detail),
+      genres,
+      moodTags: deriveMoodTags(keywords, genres),
+      companionTags: deriveCompanionTags(keywords, genres, ageRating),
+      ageRating,
       originCountries: countries.origin,
       productionCountries: countries.production,
       providers,
@@ -391,13 +402,40 @@ export function normalizeTmdbDetail(
   };
 }
 
+/**
+ * 동반자 코드의 한국어 표기. 검색 질의는
+ * `domains/search/query.ts` 의 COMPANION_COPY 로 만들어지므로 같은 낱말을
+ * 문서에도 넣어야 임베딩이 맞물린다.
+ */
+const COMPANION_LABELS: Readonly<Record<string, string>> = {
+  ALONE: "혼자",
+  PARTNER: "연인과",
+  FRIENDS: "친구와",
+  FAMILY: "가족과",
+  WITH_CHILDREN: "아이와",
+};
+
+/**
+ * 분위기·동반자 태그를 문서에 넣는다 (TEAM-2: catalog row 와 search document
+ * 양쪽에 반영). 빠져 있으면 pgvector 가 `긴장감 있는` 작품을 상위 후보로
+ * 올리지 못해 SEARCH_LIMIT 에서 잘리고, 이후 점수 계산으로는 복구되지 않는다.
+ */
 function searchDocumentText(content: CatalogContent): string {
+  const companions = content.companionTags
+    .map((tag) => COMPANION_LABELS[tag] ?? tag)
+    .filter(Boolean);
   return [
     `제목: ${content.title}`,
     content.synopsis ? `줄거리: ${content.synopsis}` : "",
     `형식: ${content.mediaType}`,
     content.genres.length > 0
       ? `장르: ${content.genres.join(", ")}`
+      : "",
+    content.moodTags.length > 0
+      ? `분위기: ${content.moodTags.join(", ")}`
+      : "",
+    companions.length > 0
+      ? `함께 보기: ${companions.join(", ")}`
       : "",
     content.originCountries.length > 0
       ? `원산지: ${content.originCountries.join(", ")}`

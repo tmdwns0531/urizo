@@ -15,11 +15,15 @@ import type {
 } from "../../../contracts/mvp-search";
 import type { CatalogRepository } from "../../../contracts/ports";
 import type { RecommendationItem } from "../../../contracts/recommendation";
-import { RESULT_LIMIT } from "../../../config/recommendation";
+import {
+  RESULT_LIMIT,
+  SELECTOR_CANDIDATE_LIMIT,
+} from "../../../config/recommendation";
 import { filterMvpCatalog } from "../../catalog/filtering";
 import {
   BudgetExceededError,
 } from "../budget";
+import { ensureRecommendationReasons } from "../reasons";
 import { scoreMvpSearchResults } from "../scoring";
 import type {
   ExecutionAttempt,
@@ -58,7 +62,11 @@ const sanitizeSearchInput = (
   moods: [...input.moods],
   desiredGenres: [...input.desiredGenres],
   companionAvoidGenres: [...input.companionAvoidGenres],
+  requiredGenres: [...(input.requiredGenres ?? [])],
+  excludedGenres: [...(input.excludedGenres ?? [])],
+  mediaType: input.mediaType ?? "ANY",
   maxRuntimeMinutes: input.maxRuntimeMinutes,
+  childAgeRatingLimit: input.childAgeRatingLimit ?? null,
   originPreference: input.originPreference,
   hasNaturalLanguage: input.hasNaturalLanguage,
 });
@@ -174,20 +182,20 @@ function selectItems(
     if (!item) {
       throw new SelectorOutputValidationError();
     }
-    if (index !== 0 || output.topPickReason === undefined) {
+    if (index !== 0) {
       return item;
     }
 
-    const reasons = [
-      output.topPickReason.trim(),
-      ...item.reasons,
-    ].filter(
-      (reason, reasonIndex, allReasons) =>
-        allReasons.indexOf(reason) === reasonIndex,
-    );
+    const openAiReasons =
+      output.topPickReason === undefined
+        ? []
+        : [output.topPickReason];
     return {
       ...item,
-      reasons: reasons.slice(0, 3),
+      reasons: ensureRecommendationReasons(item.content, [
+        ...openAiReasons,
+        ...item.reasons,
+      ]),
     };
   });
 }
@@ -265,6 +273,8 @@ export class PipelineRecommendationExecutor
 
     try {
       consumeSearchModelUsage(searchOutput, context);
+      // 교체용 깊이는 ranked 전체로 남기고, 모델에는 상위 일부만 보낸다.
+      const selectorCandidates = ranked.slice(0, SELECTOR_CANDIDATE_LIMIT);
       const selectorOutput =
         context.selectionMode === "ranked"
           ? {
@@ -277,14 +287,17 @@ export class PipelineRecommendationExecutor
             ? await context.budget.runModel(
                 (signal) =>
                   this.selector.select(
-                    ranked,
+                    selectorCandidates,
                     this.resultLimit,
                     signal,
                   ),
                 (output) => output.tokenUsage,
                 readErrorTokenUsage,
               )
-            : await this.selector.select(ranked, this.resultLimit);
+            : await this.selector.select(
+                selectorCandidates,
+                this.resultLimit,
+              );
 
       validateSelectorOutput(
         selectorOutput,

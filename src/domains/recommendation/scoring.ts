@@ -12,8 +12,16 @@ import {
   RECOMMENDATION_WEIGHTS,
   type RecommendationWeights,
 } from "../../config/recommendation";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+
+const hasTasteSignals = (input: SanitizedRecommendationSearchInput): boolean =>
+  input.moods.length > 0 ||
+  input.desiredGenres.length > 0 ||
+  input.hasNaturalLanguage ||
+  input.originPreference !== "ANY" ||
+  input.companions.some((companion) => companion !== "ANY");
 
 const matchRatio = (
   actual: readonly string[],
@@ -25,6 +33,28 @@ const matchRatio = (
   }
   const matches = desired.filter((item) => actual.includes(item)).length;
   return clamp(matches / desired.length);
+};
+
+/**
+ * 선호 조건은 "이 중 하나라도" 로 본다. 하나라도 맞으면 만점이고, 더 맞아도
+ * 더 오르지 않는다.
+ *
+ * 비율(matchRatio)로 계산하면 사용자가 취향을 많이 고를수록 점수가 떨어진다.
+ * 화면의 "SF / 판타지" 는 칩 하나지만 내부 값이 둘이라, 액션과 함께 고르면
+ * 장르 3개를 모두 갖춘 작품만 만점을 받는다 — 실측으로 '이탈리안 잡' 이
+ * 액션만 있어 33점, '아케인' 이 0점을 받아 각각 69%·59% 로 내려갔다.
+ * 액션과 SF 를 고른 사람은 "둘 다인 작품" 이 아니라 "둘 중 하나면 좋겠다"
+ * 는 뜻이므로 OR 로 본다.
+ */
+const matchesAny = (
+  actual: readonly string[],
+  desired: readonly string[],
+  emptyScore: number,
+): number => {
+  if (desired.length === 0) {
+    return emptyScore;
+  }
+  return desired.some((item) => actual.includes(item)) ? 1 : 0;
 };
 
 interface ScorableSearchResult {
@@ -91,7 +121,8 @@ function applyDiversityPenalty(
     return {
       ...item,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent:
+        item.matchPercent === null ? null : Math.round(total * 100),
       scoreBreakdown: {
         ...item.scoreBreakdown,
         diversityPenalty,
@@ -146,7 +177,7 @@ function buildMvpReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /**
@@ -170,22 +201,26 @@ export function scoreMvpSearchResults(
       ? withoutGenreWeight(configuredWeights)
       : configuredWeights;
   const qualityScores = normalizeQuality(results);
+  const showMatchPercent = hasTasteSignals(input);
 
   const initial = results.map((result): RecommendationItem => {
     const content = result.content;
     const semantic = clamp(result.semanticScore);
-    const mood = matchRatio(content.moodTags, input.moods, 0.5);
+    const mood = matchesAny(content.moodTags, input.moods, 0.5);
     const genre =
       input.desiredGenres.length === 0
         ? 0
-        : matchRatio(content.genres, input.desiredGenres, 0);
+        : matchesAny(content.genres, input.desiredGenres, 0);
+    // 시청 시간을 고르지 않은 것은 "아무 길이나 좋다" 는 뜻이다. 예전에는
+    // 0.7 을 박아 넣어, 조건을 덜 건 사람이 오히려 감점을 받았다 — 무제한이면
+    // 전체가 73% 근처에서 막히고 120분을 고르면 80%대가 나왔다.
     const runtime =
       input.maxRuntimeMinutes === null
-        ? 0.7
+        ? 1
         : clamp(0.5 + content.runtimeMinutes / input.maxRuntimeMinutes / 2);
     const quality = qualityScores.get(content.id) ?? 0.5;
     const companions = input.companions.filter((item) => item !== "ANY");
-    const companion = matchRatio(content.companionTags, companions, 0.7);
+    const companion = matchesAny(content.companionTags, companions, 0.7);
     const total =
       semantic * weights.semantic +
       mood * weights.mood +
@@ -207,7 +242,9 @@ export function scoreMvpSearchResults(
     return {
       content,
       score: scoreBreakdown.total,
-      matchPercent: Math.round(scoreBreakdown.total * 100),
+      matchPercent: showMatchPercent
+        ? Math.round(scoreBreakdown.total * 100)
+        : null,
       scoreBreakdown,
       reasons: buildMvpReasons(result, input, scoreBreakdown),
     };
@@ -256,7 +293,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 품질이 높아요");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 /** @deprecated Use scoreMvpSearchResults for anonymous MVP code. */

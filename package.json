@@ -20,6 +20,7 @@
     "db:validate": "node scripts/prisma-validate.mjs",
     "db:migrate:deploy": "node --env-file-if-exists=.env.local node_modules/prisma/build/index.js migrate deploy",
     "live:catalog:ingest": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs scripts/live-ingest-tmdb.ts",
+    "live:catalog:refresh": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs scripts/live-refresh-catalog.ts",
     "live:catalog:embed": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs scripts/live-embed-catalog.ts",
     "live:prepare": "npm run db:migrate:deploy && npm run live:catalog:ingest && npm run live:catalog:embed"
   },

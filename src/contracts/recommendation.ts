@@ -47,7 +47,7 @@ export interface ScoreBreakdown {
 export interface RecommendationItem {
   content: CatalogContent;
   score: number;
-  matchPercent: number;
+  matchPercent: number | null;
   scoreBreakdown: ScoreBreakdown;
   reasons: string[];
   replacementOf?: string;

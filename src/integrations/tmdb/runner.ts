@@ -7,13 +7,15 @@ import {
   createTmdbClient,
   type TmdbClientOptions,
 } from "./client";
-import type { TmdbMediaKind } from "./types";
+import type { TmdbDiscoverSweep, TmdbMediaKind } from "./types";
 
 export interface RunTmdbCatalogIngestionOptions
   extends TmdbClientOptions {
   writer: TmdbCatalogWriter;
   pages?: number;
   mediaKinds?: readonly TmdbMediaKind[];
+  /** 비우면 DEFAULT_DISCOVER_SWEEPS. 일부만 지정하면 그 sweep 만 돈다. */
+  sweeps?: readonly TmdbDiscoverSweep[];
   locale?: string;
 }
 
@@ -28,6 +30,7 @@ export async function runTmdbCatalogIngestion(
     writer,
     pages,
     mediaKinds,
+    sweeps,
     locale,
     ...clientOptions
   } = options;
@@ -36,6 +39,7 @@ export async function runTmdbCatalogIngestion(
     writer,
     pages,
     mediaKinds,
+    sweeps,
     locale,
   });
 }

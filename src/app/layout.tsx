@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { ChoiceHandoffProvider } from "@/components/choice-handoff/choice-handoff-provider";
+import { CuratorRoot } from "@/components/curator/curator-root";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,7 +58,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <ChoiceHandoffProvider>{children}</ChoiceHandoffProvider>
+        <CuratorRoot />
+      </body>
     </html>
   );
 }

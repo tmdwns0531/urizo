@@ -16,11 +16,24 @@ import type {
 import { RESULT_LIMIT } from "../../config/recommendation";
 import { filterMvpCatalog } from "../catalog/filtering";
 import type { ExecutionAttempt } from "./executors/types";
+import { ensureRecommendationReasons } from "./reasons";
 
 const clamp = (value: number): number =>
   Math.max(0, Math.min(1, value));
 
-const matchRatio = (
+const hasTasteSignals = (input: SanitizedRecommendationSearchInput): boolean =>
+  input.moods.length > 0 ||
+  input.desiredGenres.length > 0 ||
+  input.hasNaturalLanguage ||
+  input.originPreference !== "ANY" ||
+  input.companions.some((companion) => companion !== "ANY");
+
+/**
+ * 선호 조건은 "이 중 하나라도" 로 본다. scoring.ts 의 matchesAny 와 같은
+ * 규칙이다 — fallback 이 다른 기준으로 점수를 매기면 LLM 실패 여부에 따라
+ * 같은 조건의 퍼센트가 달라 보인다.
+ */
+const matchesAny = (
   actual: readonly string[],
   desired: readonly string[],
   emptyScore: number,
@@ -28,10 +41,7 @@ const matchRatio = (
   if (desired.length === 0) {
     return emptyScore;
   }
-  const matches = desired.filter((item) =>
-    actual.includes(item),
-  ).length;
-  return clamp(matches / desired.length);
+  return desired.some((item) => actual.includes(item)) ? 1 : 0;
 };
 
 const qualityRaw = (content: CatalogContent): number =>
@@ -94,7 +104,7 @@ function buildReasons(
     reasons.push("평점과 평가 수를 함께 본 작품 기대치가 높아요.");
   }
 
-  return reasons.slice(0, 3);
+  return ensureRecommendationReasons(content, reasons);
 }
 
 function scoreEligibleCatalog(
@@ -105,23 +115,25 @@ function scoreEligibleCatalog(
   const companions = input.companions.filter(
     (companion) => companion !== "ANY",
   );
+  const showMatchPercent = hasTasteSignals(input);
 
   const scored = contents.map((content): RecommendationItem => {
-    const mood = matchRatio(content.moodTags, input.moods, 0.5);
-    const genre = matchRatio(
+    const mood = matchesAny(content.moodTags, input.moods, 0.5);
+    const genre = matchesAny(
       content.genres,
       input.desiredGenres,
       0.5,
     );
-    const companion = matchRatio(
+    const companion = matchesAny(
       content.companionTags,
       companions,
       0.7,
     );
     const quality = qualityScores.get(content.id) ?? 0.5;
+    // 시청 시간 무제한은 감점 사유가 아니다 (scoring.ts 와 동일 규칙).
     const runtime =
       input.maxRuntimeMinutes === null
-        ? 0.7
+        ? 1
         : clamp(
             0.5 +
               content.runtimeMinutes /
@@ -149,7 +161,7 @@ function scoreEligibleCatalog(
     return {
       content,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent: showMatchPercent ? Math.round(total * 100) : null,
       scoreBreakdown,
       reasons: buildReasons(content, input, quality),
     };
@@ -179,7 +191,8 @@ function scoreEligibleCatalog(
     return {
       ...item,
       score: total,
-      matchPercent: Math.round(total * 100),
+      matchPercent:
+        item.matchPercent === null ? null : Math.round(total * 100),
       scoreBreakdown: {
         ...item.scoreBreakdown,
         diversityPenalty,

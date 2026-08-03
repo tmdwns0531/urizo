@@ -15,7 +15,7 @@ import {
 const SEMANTIC_GROUPS: readonly (readonly string[])[] = [
   ["웃긴", "웃음", "코미디", "유쾌한", "재치있는", "가벼운", "즐거운"],
   ["따뜻한", "위로", "힐링", "편안한", "잔잔한", "다정한"],
-  ["긴장", "긴장감", "스릴러", "미스터리", "추리", "몰입"],
+  ["긴장", "긴장감", "스릴러", "미스터리", "추리", "몰입", "반전"],
   ["감성", "감성적인", "로맨스", "사랑", "낭만", "눈물"],
   ["가족", "아이", "어린이", "함께", "애니메이션"],
   ["액션", "모험", "속도감", "영웅", "히어로"],
@@ -238,17 +238,36 @@ function fingerprintPayload(
   input: SanitizedRecommendationSearchInput,
   queryVector: QueryVectorSnapshot,
 ): Record<string, unknown> {
+  const normalizedInitialChoiceWithoutNaturalLanguage: Record<string, unknown> = {
+    companionAvoidGenres: sortStrings(input.companionAvoidGenres),
+    companions: sortStrings(input.companions),
+    desiredGenres: sortStrings(input.desiredGenres),
+    hasNaturalLanguage: input.hasNaturalLanguage,
+    maxRuntimeMinutes: input.maxRuntimeMinutes,
+    moods: sortStrings(input.moods),
+    originPreference: input.originPreference,
+    selectedProviders: sortStrings(input.selectedProviders),
+  };
+  if (input.childAgeRatingLimit != null) {
+    normalizedInitialChoiceWithoutNaturalLanguage.childAgeRatingLimit =
+      input.childAgeRatingLimit;
+  }
+  if (input.mediaType != null && input.mediaType !== "ANY") {
+    normalizedInitialChoiceWithoutNaturalLanguage.mediaType = input.mediaType;
+  }
+  if ((input.requiredGenres?.length ?? 0) > 0) {
+    normalizedInitialChoiceWithoutNaturalLanguage.requiredGenres = sortStrings(
+      input.requiredGenres,
+    );
+  }
+  if ((input.excludedGenres?.length ?? 0) > 0) {
+    normalizedInitialChoiceWithoutNaturalLanguage.excludedGenres = sortStrings(
+      input.excludedGenres,
+    );
+  }
+
   return {
-    normalizedInitialChoiceWithoutNaturalLanguage: {
-      companionAvoidGenres: sortStrings(input.companionAvoidGenres),
-      companions: sortStrings(input.companions),
-      desiredGenres: sortStrings(input.desiredGenres),
-      hasNaturalLanguage: input.hasNaturalLanguage,
-      maxRuntimeMinutes: input.maxRuntimeMinutes,
-      moods: sortStrings(input.moods),
-      originPreference: input.originPreference,
-      selectedProviders: sortStrings(input.selectedProviders),
-    },
+    normalizedInitialChoiceWithoutNaturalLanguage,
     queryVector: {
       algorithm: queryVector.algorithm,
       dimensions: queryVector.dimensions,

@@ -1,6 +1,8 @@
 import {
+  MEDIA_TYPES,
   OTT_PROVIDERS,
   type CatalogContent,
+  type MediaType,
   type OttProvider,
 } from "./catalog";
 
@@ -16,6 +18,13 @@ export type Companion = (typeof COMPANIONS)[number];
 
 export const ORIGIN_PREFERENCES = ["KR", "NON_KR", "ANY"] as const;
 export type OriginPreference = (typeof ORIGIN_PREFERENCES)[number];
+
+/**
+ * Request-side media preference. Catalog rows can only be MOVIE or SERIES;
+ * ANY is deliberately confined to recommendation input.
+ */
+export const MEDIA_TYPE_PREFERENCES = [...MEDIA_TYPES, "ANY"] as const;
+export type MediaTypePreference = MediaType | "ANY";
 
 export const MVP_MOODS = [
   "밝은",
@@ -33,6 +42,19 @@ export type Mood = (typeof MVP_MOODS)[number];
 export const CHOICE_RUNTIME_MINUTES = [30, 60, 120, 180, null] as const;
 export type ChoiceRuntimeMinutes = (typeof CHOICE_RUNTIME_MINUTES)[number];
 export type EffectiveRuntimeMinutes = ChoiceRuntimeMinutes | 45;
+/**
+ * Persisted runtime limit after the bounded Agent has structured a natural
+ * language expression. The public CHOICE DTO remains limited to its fixed
+ * presets, while natural-language requests may preserve an exact minute value.
+ */
+export type AgentStructuredRuntimeMinutes = number | null;
+
+/**
+ * Maximum Korean viewing rating approved for a child who is watching along.
+ * This is a policy threshold, not the child's exact age.
+ */
+export const CHILD_AGE_RATING_LIMITS = ["ALL", "7", "12", "15"] as const;
+export type ChildAgeRatingLimit = (typeof CHILD_AGE_RATING_LIMITS)[number];
 
 export const NATURAL_LANGUAGE_MAX_CODE_POINTS = 140;
 export const MVP_GENRE_MAX_ITEMS = 20;
@@ -62,8 +84,17 @@ export interface MvpRecommendationChoice {
   explicitlyRequestedGenres?: string[];
 }
 
+/** v0.9 bounded-Agent extension of the accepted anonymous CHOICE DTO. */
+export interface MvpAgentRecommendationChoice extends MvpRecommendationChoice {
+  childAgeRatingLimit?: ChildAgeRatingLimit | null;
+  mediaType?: MediaTypePreference;
+  naturalRuntimeMinutes?: AgentStructuredRuntimeMinutes;
+  requiredGenres?: string[];
+  excludedGenres?: string[];
+}
+
 export interface MvpRecommendationRequest {
-  choice?: MvpRecommendationChoice;
+  choice?: MvpAgentRecommendationChoice;
 }
 
 export const MVP_DEMO_SCENARIOS = [
@@ -126,7 +157,11 @@ export interface SanitizedRecommendationSearchInput {
   moods: Mood[];
   desiredGenres: string[];
   companionAvoidGenres: string[];
-  maxRuntimeMinutes: EffectiveRuntimeMinutes;
+  requiredGenres: string[];
+  excludedGenres: string[];
+  mediaType: MediaTypePreference;
+  maxRuntimeMinutes: AgentStructuredRuntimeMinutes;
+  childAgeRatingLimit: ChildAgeRatingLimit | null;
   originPreference: OriginPreference;
   hasNaturalLanguage: boolean;
 }
@@ -165,11 +200,16 @@ export const MVP_NEUTRAL_CHOICE = {
   moods: [],
   desiredGenres: [],
   companionAvoidGenres: [],
+  requiredGenres: [],
+  excludedGenres: [],
+  mediaType: "ANY",
   maxRuntimeMinutes: null,
+  naturalRuntimeMinutes: null,
+  childAgeRatingLimit: null,
   originPreference: "ANY",
   naturalLanguage: "",
   explicitlyRequestedGenres: [],
-} as const satisfies Required<MvpRecommendationChoice>;
+} as const satisfies Required<MvpAgentRecommendationChoice>;
 
 export const MVP_NEUTRAL_SANITIZED_SEARCH_INPUT = {
   selectedProviders: [...OTT_PROVIDERS],
@@ -177,7 +217,11 @@ export const MVP_NEUTRAL_SANITIZED_SEARCH_INPUT = {
   moods: [],
   desiredGenres: [],
   companionAvoidGenres: [],
+  requiredGenres: [],
+  excludedGenres: [],
+  mediaType: "ANY",
   maxRuntimeMinutes: null,
+  childAgeRatingLimit: null,
   originPreference: "ANY",
   hasNaturalLanguage: false,
 } as const satisfies SanitizedRecommendationSearchInput;
