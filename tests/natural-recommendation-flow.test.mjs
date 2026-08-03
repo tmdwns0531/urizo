@@ -447,7 +447,13 @@ test("prompt route composes the full cancellable state flow", async () => {
     result,
     /답을 받기 전에는 카탈로그를 검색하거나 조건을 임의로 바꾸지 않아요\./,
   );
-  assert.match(result, /<ContentCard item=\{response\.topPick\} rank=\{1\} hero/);
+  // Matched across lines: the top pick card gained replacement props, so the
+  // single-line form no longer holds. The identity that matters is that the
+  // top pick still renders as the hero card.
+  assert.match(
+    result,
+    /<ContentCard\s+item=\{response\.topPick\}\s+rank=\{1\}\s+hero/,
+  );
   assert.match(result, /snap-x snap-mandatory/);
   assert.match(result, /md:grid-cols-2/);
   assert.match(result, /lg:grid-cols-3/);
