@@ -2,6 +2,7 @@ import type { OttProvider } from "@/contracts/catalog";
 import type {
   ChoiceRuntimeMinutes,
   Companion,
+  MediaTypePreference,
   Mood,
   OriginPreference,
 } from "@/contracts/mvp-search";
@@ -36,5 +37,6 @@ export type ChoiceFormState = {
   otts: OttProvider[];
   mood: MoodChoice | null;
   origin: OriginPreference | null;
+  mediaType: MediaTypePreference | null;
   genres: GenreChoice[];
 };

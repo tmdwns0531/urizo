@@ -3,6 +3,7 @@ import {
   CHILD_AGE_OPTIONS,
   DURATION_OPTIONS,
   GENRE_OPTIONS,
+  MEDIA_TYPE_OPTIONS,
   MOOD_OPTIONS,
   NO_COMPANION_OPTION,
   ORIGIN_OPTIONS,
@@ -74,6 +75,10 @@ export function Step6Summary({ state, onEdit }: Step6SummaryProps) {
     state.origin === null
       ? "선택 안 함"
       : (findLabel(ORIGIN_OPTIONS, state.origin) ?? "선택 안 함");
+  const mediaTypeLabel =
+    state.mediaType === null
+      ? "선택 안 함"
+      : (findLabel(MEDIA_TYPE_OPTIONS, state.mediaType) ?? "선택 안 함");
   const genreLabels = state.genres.map(
     (genre) => findLabel(GENRE_OPTIONS, genre) ?? genre,
   );
@@ -126,6 +131,9 @@ export function Step6Summary({ state, onEdit }: Step6SummaryProps) {
         </SummaryRow>
 
         <SummaryRow step={5} label="취향 더하기" onEdit={onEdit}>
+          <span className="block text-sm font-medium leading-6 text-slate-300 sm:text-base">
+            작품 유형: {mediaTypeLabel}
+          </span>
           <span className="block text-sm font-medium leading-6 text-slate-300 sm:text-base">
             제작 지역: {originLabel}
           </span>

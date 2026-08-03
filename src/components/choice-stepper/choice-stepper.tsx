@@ -265,6 +265,9 @@ export function ChoiceStepper() {
               <Step5Extra
                 state={state}
                 onOriginChange={(value) => dispatch({ type: "SET_ORIGIN", value })}
+                onMediaTypeChange={(value) =>
+                  dispatch({ type: "SET_MEDIA_TYPE", value })
+                }
                 onToggleGenre={(value) =>
                   dispatch({ type: "TOGGLE_GENRE", value })
                 }

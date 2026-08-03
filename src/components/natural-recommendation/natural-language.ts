@@ -285,6 +285,7 @@ export function interpretNaturalRequest(
     otts,
     mood,
     origin,
+    mediaType,
     genres,
   };
 
@@ -454,6 +455,7 @@ export function toChoiceHandoffDraft(
     otts: [...draft.otts],
     mood: draft.mood,
     origin: draft.origin,
+    mediaType: draft.mediaType,
     genres: [...draft.genres],
   };
 }
