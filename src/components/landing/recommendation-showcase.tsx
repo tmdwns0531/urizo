@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PREVIEW_POSTERS } from "./landing-data";
 
 export function RecommendationShowcase() {
@@ -10,22 +9,16 @@ export function RecommendationShowcase() {
     >
       <div className="absolute -right-40 top-20 h-96 w-96 rounded-full bg-[#324e68]/25 blur-3xl" aria-hidden="true" />
       <div className="app-container relative">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-bold tracking-[0.14em] text-[#ff9b7c]">추천 화면 미리보기</p>
-            <h2 id="showcase-title" className="mt-3 text-balance text-3xl font-black leading-tight tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
-              많이 보여주기보다,
-              <br className="hidden sm:block" /> 고를 수 있게 비교해요.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">
-              작품 수를 늘리는 대신 지금 상황에 맞는 후보를 추리고, 서로
-              다른 매력을 빠르게 파악할 수 있도록 정리합니다.
-            </p>
-          </div>
-          <Link href="/choice" className="group inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-bold text-white transition hover:border-[#ff7043]/50 hover:bg-[#ff7043]/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7043]">
-            내 조건으로 추천 받기
-            <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
-          </Link>
+        <div className="max-w-3xl">
+          <p className="text-sm font-bold tracking-[0.14em] text-[#ff9b7c]">추천 화면 미리보기</p>
+          <h2 id="showcase-title" className="mt-3 text-balance text-3xl font-black leading-tight tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
+            많이 보여주기보다,
+            <br className="hidden sm:block" /> 고를 수 있게 비교해요.
+          </h2>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">
+            작품 수를 늘리는 대신 지금 상황에 맞는 후보를 추리고, 서로
+            다른 매력을 빠르게 파악할 수 있도록 정리합니다.
+          </p>
         </div>
 
         <div className="mt-12 grid overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0e141b] shadow-[0_30px_90px_rgba(0,0,0,.28)] sm:mt-16 lg:grid-cols-[.75fr_1.25fr]">

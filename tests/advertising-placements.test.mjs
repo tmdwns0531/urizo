@@ -83,6 +83,27 @@ test("sponsored creative keeps only impression and click measurements", async ()
   assert.doesNotMatch(contract, /"VIDEO_START"|"VIDEO_COMPLETE"/);
 });
 
+test("sponsored cards lead through the internal demo partner promotion", async () => {
+  const [selector, page, partner] = await Promise.all([
+    read("src/domains/advertising/campaign-selector.ts"),
+    read("src/app/sponsor/demo/page.tsx"),
+    read("public/partner-demo.html"),
+  ]);
+
+  assert.match(selector, /detailUrl: "\/sponsor\/demo"/);
+  assert.match(selector, /detailUrl: "\/sponsor\/demo\?campaign=orbiel"/);
+  assert.match(page, /파트너 프로모션/);
+  assert.doesNotMatch(page, /실제 제휴나 결제가 없는/);
+  assert.match(page, /\/partner-demo\.html\?campaign=/);
+  assert.match(page, /파트너 사이트에서 보기 ↗/);
+  assert.match(page, /rel="noreferrer sponsored"/);
+  assert.doesNotMatch(page, /데모 광고/);
+  assert.match(page, /lumia-glass-forest-poster\.webp/);
+  assert.match(page, /absolute inset-x-0 bottom-0/);
+  assert.match(partner, /VIA PLAY/);
+  assert.doesNotMatch(partner, /가상 파트너 서비스/);
+});
+
 test("ad selection request, anonymous context, and event API boundaries stay intact", async () => {
   const [ad, contract, route, eventsRoute, selector] = await Promise.all([
     read("src/components/advertising/sponsored-video-ad.tsx"),

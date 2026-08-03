@@ -130,7 +130,7 @@ test("OTT Damoa anonymous Demo integration", async (t) => {
     assert.match(html, /<main\b/i);
     assert.match(html, /<footer\b/i);
     assert.match(html, /href="\/choice"/i);
-    assert.match(html, /조건 골라 추천받기/);
+    assert.match(html, /조건을 골라 추천받기/);
     assert.match(html, /문장으로 추천받기/);
     assert.match(html, /href="\/prompt"/i);
     assert.doesNotMatch(

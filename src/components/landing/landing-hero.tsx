@@ -47,7 +47,7 @@ export function LandingHero() {
               data-cta="primary"
               className="group inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff5430] to-[#ff7c42] px-7 py-3 text-sm font-extrabold text-white shadow-[0_12px_35px_rgba(255,107,61,0.28)] transition hover:-translate-y-0.5 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:text-base"
             >
-              조건 골라 추천받기
+              조건을 골라 추천받기
               <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
             </Link>
             <Link
