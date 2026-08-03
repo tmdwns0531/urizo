@@ -4,9 +4,26 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("result UI uses user-facing and consistent recommendation copy", async () => {
-  const [view, card, timeline] = await Promise.all([
+test("choice and natural results share one completed result structure", async () => {
+  const [choice, natural, completed] = await Promise.all([
     read("src/components/recommendation-view.tsx"),
+    read("src/components/natural-recommendation/natural-result.tsx"),
+    read("src/components/completed-recommendation-result.tsx"),
+  ]);
+
+  assert.match(choice, /<CompletedRecommendationResult[\s\S]*?source="choice"/);
+  assert.match(natural, /<CompletedRecommendationResult[\s\S]*?source="natural"/);
+  assert.match(completed, /영화·시리즈 모두/);
+  assert.match(completed, /같은 조건으로 다른 5편 보기/);
+  assert.match(completed, /현재 조건 수정하기/);
+  assert.match(completed, /처음부터 새 조건으로 추천받기/);
+  assert.match(completed, /새 문장으로 다시 추천받기/);
+});
+
+test("result UI uses user-facing and consistent recommendation copy", async () => {
+  const [view, completed, card, timeline] = await Promise.all([
+    read("src/components/recommendation-view.tsx"),
+    read("src/components/completed-recommendation-result.tsx"),
     read("src/components/content-card.tsx"),
     read("src/components/recommendation-timeline.tsx"),
   ]);
@@ -20,14 +37,35 @@ test("result UI uses user-facing and consistent recommendation copy", async () =
     "후보 점수 계산",
     "마지막 정책 검사",
   ]) {
-    assert.ok(!view.includes(copy), `result UI must not expose "${copy}"`);
+    assert.ok(
+      !`${view}\n${completed}\n${timeline}`.includes(copy),
+      `result UI must not expose "${copy}"`,
+    );
   }
   assert.ok(!card.includes("% match"), "match label must not mix English");
   assert.ok(card.includes("취향 일치"), "match label must use the Korean term");
-  assert.ok(
-    timeline.includes("traceMetricLabels"),
-    "trace metrics need user labels",
-  );
+  for (const copy of [
+    "추천 기준 확인하기",
+    "선택한 조건을 먼저 적용했어요.",
+    "조건에 맞는 작품을 비교했어요.",
+    "추천 구성이 한쪽으로 치우치지 않는지 확인했어요.",
+    "최종 추천 전에 다시 확인했어요.",
+  ]) {
+    assert.ok(timeline.includes(copy), `criteria must include "${copy}"`);
+  }
+  for (const technicalCopy of [
+    "searchCatalog",
+    "Agent가",
+    "AI 처리량",
+    "도구 호출",
+    "durationMs",
+    "추천 과정",
+  ]) {
+    assert.ok(
+      !timeline.includes(technicalCopy),
+      `criteria must not expose "${technicalCopy}"`,
+    );
+  }
 });
 
 test("approval progress copy reads runtime values from its proposal", async () => {

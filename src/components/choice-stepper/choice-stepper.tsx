@@ -37,7 +37,11 @@ const REQUIRED_CONTROL_NAMES: Partial<Record<ChoiceStep, string>> = {
 
 export function ChoiceStepper() {
   const router = useRouter();
-  const { pendingChoiceHandoff, consumeChoiceHandoff } = useChoiceHandoff();
+  const {
+    pendingChoiceHandoff,
+    publishChoiceHandoff,
+    consumeChoiceHandoff,
+  } = useChoiceHandoff();
   const [initialHandoff] = useState(() => pendingChoiceHandoff);
   const [state, dispatch] = useReducer(
     choiceReducer,
@@ -157,6 +161,7 @@ export function ChoiceStepper() {
       if (!response.ok || !result?.runId) {
         throw new Error(result?.error ?? "추천을 시작하지 못했어요.");
       }
+      publishChoiceHandoff(state);
       router.push(`/recommendations/${encodeURIComponent(result.runId)}`);
     } catch (error) {
       setSubmitError(

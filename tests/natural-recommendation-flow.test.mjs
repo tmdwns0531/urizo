@@ -411,12 +411,13 @@ test("loading keeps its content above non-interactive cinema emoji particles", a
 });
 
 test("prompt route composes the full cancellable state flow", async () => {
-  const [page, flow, result, provider, layout, choice] = await Promise.all([
+  const [page, flow, result, completed, provider, layout, choice] = await Promise.all([
     readSource("src/app/prompt/page.tsx"),
     readSource(
       "src/components/natural-recommendation/natural-recommendation-flow.tsx",
     ),
     readSource("src/components/natural-recommendation/natural-result.tsx"),
+    readSource("src/components/completed-recommendation-result.tsx"),
     readSource(
       "src/components/choice-handoff/choice-handoff-provider.tsx",
     ),
@@ -447,23 +448,14 @@ test("prompt route composes the full cancellable state flow", async () => {
     result,
     /답을 받기 전에는 카탈로그를 검색하거나 조건을 임의로 바꾸지 않아요\./,
   );
-  // Matched across lines: the top pick card gained replacement props, so the
-  // single-line form no longer holds. The identity that matters is that the
-  // top pick still renders as the hero card.
-  assert.match(
-    result,
-    /<ContentCard\s+item=\{response\.topPick\}\s+rank=\{1\}\s+hero/,
-  );
-  assert.match(result, /snap-x snap-mandatory/);
-  assert.match(result, /md:grid-cols-2/);
-  assert.match(result, /lg:grid-cols-3/);
-  assert.match(result, /xl:grid-cols-5/);
-  assert.match(result, /variant="rail"/);
-  assert.match(result, /<RecommendationTimeline/);
-  assert.match(
-    result,
-    /\) : \(\s*<>\s*<CompletedNaturalResults[\s\S]*?<RecommendationTimeline[\s\S]*?<ResultActions[\s\S]*?<\/>\s*\)}/,
-  );
+  assert.match(result, /<CompletedRecommendationResult[\s\S]*?source="natural"/);
+  assert.match(completed, /item=\{response\.topPick\}[\s\S]*?rank=\{1\}[\s\S]*?hero/);
+  assert.match(completed, /grid-cols-1/);
+  assert.match(completed, /sm:grid-cols-2/);
+  assert.match(completed, /lg:grid-cols-3/);
+  assert.match(completed, /xl:grid-cols-5/);
+  assert.match(completed, /variant="rail"/);
+  assert.match(completed, /<RecommendationTimeline/);
   assert.match(result, /<NaturalConditionSummary interpretation=\{interpretation\}/);
   assert.match(result, /publishChoiceHandoff\(interpretation\.draft\);[\s\S]*router\.push\("\/choice"\)/);
   assert.doesNotMatch(`${flow}\n${result}\n${provider}`, /localStorage|sessionStorage|URLSearchParams|console\.log/);
@@ -473,7 +465,7 @@ test("prompt route composes the full cancellable state flow", async () => {
 
   const runtimeApproval = result.slice(
     result.indexOf("function RuntimeApprovalBanner"),
-    result.indexOf("function AgentClarificationChat"),
+    result.indexOf("function FamilyClarification"),
   );
   assert.match(runtimeApproval, /bg-\[#191d22\]/);
   assert.match(runtimeApproval, /from-\[#ff5430\] to-\[#ff7c42\]/);
@@ -484,12 +476,12 @@ test("prompt route composes the full cancellable state flow", async () => {
   );
 
   for (const label of [
-    "디테일하게 직접 고르기",
-    "같은 조건으로 다시 추천받기",
-    "한마디 수정하기",
-    "새 한마디로 시작하기",
+    "같은 조건으로 다른 5편 보기",
+    "현재 조건 수정하기",
+    "새 문장으로 다시 추천받기",
+    "조건을 직접 선택해 다시 추천받기",
   ]) {
-    assert.match(result, new RegExp(label));
+    assert.match(completed, new RegExp(label));
   }
 });
 
@@ -544,13 +536,8 @@ test("natural input keeps text primary and condition defaults collapsed", async 
   }
   assert.doesNotMatch(summary, /기본 설정 4개 보기/);
 
-  for (const action of [
-    "시청 시간 늘리기",
-    "영화·시리즈 모두 보기",
-    "조건 다시 입력하기",
-  ]) {
-    assert.match(result, new RegExp(action));
-  }
+  assert.match(result, /onAllowAnyMediaType=\{onAllowAnyMediaType\}/);
+  assert.match(result, /onEditConditions=\{onEditInput\}/);
 });
 
 test("Choice handoff provider allowlists only structured form fields", async () => {
